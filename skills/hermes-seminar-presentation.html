@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hermes: свой AI-агент на своём сервере — семинар</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#111823; --ink:#e8eef6; --dim:#8ea0b5;
+    --acc:#4fd1c5; --acc2:#9f7aea; --warn:#f6ad55; --ok:#68d391;
+    --code-bg:#0a1020; --border:#1e2a3a;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    overflow:hidden}
+  .deck{height:100%;position:relative}
+  .slide{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;
+    padding:6vh 8vw;opacity:0;transform:translateX(40px);transition:opacity .35s ease,transform .35s ease;
+    pointer-events:none;overflow-y:auto}
+  .slide.active{opacity:1;transform:none;pointer-events:auto}
+  .kicker{color:var(--acc);font-size:.95rem;letter-spacing:.18em;text-transform:uppercase;
+    font-weight:700;margin-bottom:1.2rem}
+  h1{font-size:clamp(2.2rem,5.5vw,4.2rem);line-height:1.08;font-weight:800;margin-bottom:1.4rem}
+  h2{font-size:clamp(1.7rem,3.8vw,2.7rem);line-height:1.15;font-weight:800;margin-bottom:1.6rem}
+  .grad{background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--dim);font-size:clamp(1.05rem,2vw,1.35rem);max-width:46ch;line-height:1.5}
+  ul.big{list-style:none;font-size:clamp(1rem,1.9vw,1.3rem);line-height:1.55}
+  ul.big li{margin:.65em 0;padding-left:1.6em;position:relative}
+  ul.big li::before{content:"◆";position:absolute;left:0;color:var(--acc);font-size:.75em;top:.35em}
+  ul.big li.warn::before{content:"⚠";color:var(--warn);font-size:1em;top:0}
+  ul.big li.ok::before{content:"✓";color:var(--ok);font-size:1em;top:0}
+  b{color:#fff}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:2.5vw;align-items:start}
+  code,pre{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace}
+  code{background:var(--code-bg);border:1px solid var(--border);border-radius:6px;
+    padding:.12em .45em;font-size:.88em;color:#a5e3d8;white-space:nowrap}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:12px;
+    padding:1em 1.2em;font-size:clamp(.8rem,1.4vw,1rem);color:#a5e3d8;overflow-x:auto;margin:1em 0}
+  pre b{color:#fff}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:1.1em 1.3em;margin:.5em 0}
+  .card h3{font-size:1.05em;margin-bottom:.35em;color:var(--acc)}
+  .card p{color:var(--dim);font-size:.95em;line-height:1.45}
+  .chip{display:inline-block;background:rgba(79,209,197,.12);border:1px solid rgba(79,209,197,.4);
+    color:var(--acc);border-radius:999px;padding:.2em .8em;font-size:.8em;font-weight:600;margin:.15em .2em .15em 0}
+  .chip.violet{background:rgba(159,122,234,.12);border-color:rgba(159,122,234,.45);color:#c4a8f5}
+  .chip.warn{background:rgba(246,173,85,.1);border-color:rgba(246,173,85,.45);color:var(--warn)}
+  .warnbox{border-left:4px solid var(--warn);background:rgba(246,173,85,.07);
+    padding:.8em 1.1em;border-radius:0 10px 10px 0;margin-top:1.2em;color:#f0d9bd;
+    font-size:clamp(.9rem,1.6vw,1.1rem);line-height:1.45}
+  .warnbox b{color:var(--warn)}
+  table{border-collapse:collapse;width:100%;font-size:clamp(.85rem,1.6vw,1.05rem)}
+  th,td{text-align:left;padding:.55em .8em;border-bottom:1px solid var(--border)}
+  th{color:var(--acc);font-weight:700;font-size:.85em;text-transform:uppercase;letter-spacing:.08em}
+  td b{white-space:nowrap}
+  td.dim{color:var(--dim)}
+  .arch{display:flex;align-items:center;gap:1.2vw;justify-content:center;margin:2em 0;flex-wrap:wrap}
+  .node{background:var(--panel);border:1px solid var(--border);border-radius:14px;
+    padding:1em 1.4em;text-align:center;min-width:130px}
+  .node .t{font-weight:700;font-size:1.05em}
+  .node .d{color:var(--dim);font-size:.8em;margin-top:.3em}
+  .node.hero{border-color:var(--acc);box-shadow:0 0 30px rgba(79,209,197,.15)}
+  .arrow{color:var(--acc);font-size:1.6em;font-weight:300}
+  .steps{counter-reset:s;display:flex;flex-direction:column;gap:.55em;margin-top:.5em}
+  .step{counter-increment:s;display:flex;gap:1em;align-items:baseline;
+    font-size:clamp(.95rem,1.8vw,1.2rem);line-height:1.4}
+  .step::before{content:counter(s);flex:0 0 1.9em;height:1.9em;line-height:1.9em;text-align:center;
+    background:linear-gradient(135deg,var(--acc),var(--acc2));color:#08131c;font-weight:800;
+    border-radius:50%;font-size:.85em}
+  .step .dim{color:var(--dim)}
+  .foot{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:space-between;
+    align-items:center;padding:.7em 1.4em;font-size:.8rem;color:var(--dim);z-index:10;
+    pointer-events:none}
+  .bar{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--acc),var(--acc2));
+    width:0;transition:width .3s ease;z-index:11}
+  .navhint{opacity:.7}
+  .clickzone{position:fixed;top:0;bottom:0;width:18vw;z-index:5;cursor:pointer}
+  .clickzone.left{left:0}.clickzone.right{right:0}
+  @media (max-width:760px){.cols{grid-template-columns:1fr}.slide{padding:5vh 6vw}}
+</style>
+</head>
+<body>
+<div class="bar" id="bar"></div>
+<div class="deck" id="deck">
+
+<!-- 1 -->
+<section class="slide">
+  <div class="kicker">Семинар · Первые автоматизации</div>
+  <h1><span class="grad">Hermes</span>: свой AI-агент<br>на своём сервере</h1>
+  <p class="sub">От пустого VPS до личного агента в Telegram — с голосом, памятью, веб-поиском и автоматизациями. За один вечер.</p>
+</section>
+
+<!-- 2 -->
+<section class="slide">
+  <div class="kicker">Что это</div>
+  <h2>Hermes — «агент, который растёт с тобой»</h2>
+  <ul class="big">
+    <li>Open-source агент от <b>Nous Research</b> (MIT-лицензия) — никакого вендор-лока</li>
+    <li><b>Память</b> между сессиями: помнит тебя, твои предпочтения и договорённости</li>
+    <li><b>Скиллы</b>: сам создаёт себе инструкции из повторяющихся задач</li>
+    <li><b>Кроны</b>: пишет тебе сам — дайджесты, напоминания, отчёты</li>
+    <li>20+ мессенджеров, 60+ инструментов, <b>любой LLM</b> на выбор</li>
+  </ul>
+</section>
+
+<!-- 3 -->
+<section class="slide">
+  <div class="kicker">Результат семинара</div>
+  <h2>Что у тебя будет к концу</h2>
+  <div class="cols">
+    <ul class="big">
+      <li class="ok">Свой сервер, закрытый по всем правилам</li>
+      <li class="ok">Telegram-бот, работающий 24/7</li>
+      <li class="ok">Понимает голосовые и отвечает голосом</li>
+      <li class="ok">Ищет в интернете и читает страницы</li>
+    </ul>
+    <ul class="big">
+      <li class="ok">Помнит тебя и учится новому</li>
+      <li class="ok">Сам пишет тебе по расписанию</li>
+      <li class="ok">Почта и календарь Google (опция)</li>
+      <li class="ok">Цена вопроса: <b>VPS от $5/мес</b> + токены</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 4 -->
+<section class="slide">
+  <div class="kicker">Архитектура</div>
+  <h2>Как это устроено</h2>
+  <div class="arch">
+    <div class="node"><div class="t">📱 Ты</div><div class="d">Telegram · голос · текст</div></div>
+    <div class="arrow">⇄</div>
+    <div class="node hero"><div class="t">🖥 Твой VPS</div><div class="d">Hermes Gateway<br>память · скиллы · кроны</div></div>
+    <div class="arrow">⇄</div>
+    <div class="node"><div class="t">🧠 Мозг</div><div class="d">любой LLM-провайдер<br>+ запасные (fallback)</div></div>
+  </div>
+  <ul class="big">
+    <li>Hermes лёгкий — тянет самый дешёвый VPS, вся тяжесть у LLM-провайдера</li>
+    <li>Инструменты: терминал, файлы, веб, картинки, календарь — на <b>твоём</b> сервере</li>
+    <li>Провайдер не понравился — <b>меняется одной командой</b></li>
+  </ul>
+</section>
+
+<!-- 5 -->
+<section class="slide">
+  <div class="kicker">Магия раздатки</div>
+  <h2>Настраивает твой Claude — по скиллу</h2>
+  <p class="sub" style="margin-bottom:1em">Тебе не нужно быть админом. Даёшь своему Claude-агенту скилл-раздатку и IP свежего сервера:</p>
+  <pre>«Вот скилл <b>hermes-vps-setup</b> и сервер <b>1.2.3.4</b>. Действуй.»</pre>
+  <ul class="big">
+    <li>Агент идёт по фазам 0–8 и <b>сам всё настраивает</b></li>
+    <li>У тебя спрашивает только API-ключи и решения</li>
+    <li>Каждый шаг проверяется, ничего не делается «молча»</li>
+    <li>Все известные грабли уже вшиты в скилл с пометкой ⚠</li>
+  </ul>
+</section>
+
+<!-- 6 -->
+<section class="slide">
+  <div class="kicker">Фазы 0–2</div>
+  <h2>Фундамент: доступ и безопасность</h2>
+  <div class="steps">
+    <div class="step"><span><b>SSH-ключ вместо пароля</b> <span class="dim">— пароль отключается совсем, брутфорсить нечего</span></span></div>
+    <div class="step"><span><b>Фаервол UFW</b> <span class="dim">— всё входящее закрыто, открыт только SSH</span></span></div>
+    <div class="step"><span><b>fail2ban</b> <span class="dim">— автобан за перебор паролей</span></span></div>
+    <div class="step"><span><b>Автообновления безопасности</b> <span class="dim">— сервер патчится сам</span></span></div>
+  </div>
+  <div class="warnbox"><b>Грабли из жизни:</b> порт SSH открывать через <code>ufw allow</code>, а не <code>ufw limit</code> — «лимит» начинает банить твоего же агента за активную работу. Проверено болью.</div>
+</section>
+
+<!-- 7 -->
+<section class="slide">
+  <div class="kicker">Фаза 3</div>
+  <h2>Установка Hermes — одна команда</h2>
+  <pre>curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash</pre>
+  <ul class="big">
+    <li>Ставит всё сама: Python, Node, ffmpeg, браузер для агента</li>
+    <li>Появляется CLI <code>hermes</code> и домашняя папка <code>~/.hermes</code></li>
+    <li>Гейтвей — это systemd-сервис: <b>переживает ребуты</b>, стартует сам</li>
+    <li>Проверка здоровья: <code>hermes doctor</code></li>
+  </ul>
+</section>
+
+<!-- 8 -->
+<section class="slide">
+  <div class="kicker">Фаза 4</div>
+  <h2>Мозг: провайдеры и бесплатные токены</h2>
+  <table>
+    <tr><th>Провайдер</th><th>Что даёт</th><th>Цена входа</th></tr>
+    <tr><td><b>Nous Portal</b></td><td class="dim">родной, вход по OAuth, без ключей</td><td>модели <code>:free</code> — бесплатно</td></tr>
+    <tr><td><b>OpenRouter</b></td><td class="dim">200+ моделей одним ключом</td><td><code>:free</code>-модели — бесплатно</td></tr>
+    <tr><td><b>Codex / ChatGPT</b></td><td class="dim">GPT из твоей подписки Plus</td><td>уже оплачено подпиской</td></tr>
+    <tr><td><b>Groq</b></td><td class="dim">молниеносный inference</td><td>щедрый free tier</td></tr>
+    <tr><td><b>Gonka</b></td><td class="dim">децентрализованная сеть, MiniMax/Kimi/Qwen</td><td><b>$20</b> новичкам (GonkaRouter)</td></tr>
+  </table>
+  <div class="warnbox"><b>Fallback-цепочка:</b> primary упал по квоте → бот сам переключается на запасную бесплатную модель. Агент не умирает никогда.</div>
+</section>
+
+<!-- 9 -->
+<section class="slide">
+  <div class="kicker">Фаза 5</div>
+  <h2>Telegram: бот рождается</h2>
+  <div class="steps">
+    <div class="step"><span><b>@BotFather</b> → <code>/newbot</code> → токен</span></div>
+    <div class="step"><span><b>Вайтлист</b>: бот отвечает только тебе <span class="dim">(fail-closed: чужим — отказ)</span></span></div>
+    <div class="step"><span><b>Доступ близким</b> — по одноразовым pairing-кодам, без ковыряния в id</span></div>
+    <div class="step"><span>Гейтвей в systemd → <b>первое сообщение боту</b> 🎉</span></div>
+  </div>
+  <div class="warnbox"><b>Грабли:</b> бот молчит, в логах «Connecting to Telegram (attempt 1/8)…» — это зависший discovery запасных IP. Лечится одной командой (в скилле есть).</div>
+</section>
+
+<!-- 10 -->
+<section class="slide">
+  <div class="kicker">Фаза 6</div>
+  <h2>Голос в обе стороны</h2>
+  <div class="cols">
+    <div>
+      <div class="card"><h3>🎙 Ты — голосом</h3><p>Groq Whisper распознаёт (быстро, бесплатно). Если Groq недоступен — локальный Whisper на самом сервере. Файлы любой длины — нарезка автоматом.</p></div>
+    </div>
+    <div>
+      <div class="card"><h3>🔊 Бот — голосом</h3><p>Edge TTS: без ключей и регистраций, десятки голосов на русском. Скажи «ответь голосом» — и агент говорит.</p></div>
+    </div>
+  </div>
+  <ul class="big">
+    <li>Надиктовал задачу по дороге → бот сделал → ответил голосом</li>
+  </ul>
+</section>
+
+<!-- 11 -->
+<section class="slide">
+  <div class="kicker">Фаза 7</div>
+  <h2>Глаза в интернет + Google-жизнь</h2>
+  <ul class="big">
+    <li><b>Поиск:</b> Brave Search (2000 запросов/мес бесплатно) или DuckDuckGo вовсе без ключа</li>
+    <li><b>Чтение страниц:</b> Firecrawl — любой URL превращается в чистый текст для агента</li>
+    <li><b>Google Workspace (опция):</b> почта, календарь, диск, таблицы через CLI <code>gog</code></li>
+  </ul>
+  <div class="warnbox"><b>Грабли Google:</b> OAuth-приложение обязательно перевести в статус <b>In production</b> — в режиме Testing токены протухают через 7 дней, и «всё сломалось само».</div>
+</section>
+
+<!-- 11b -->
+<section class="slide">
+  <div class="kicker">Опция · продвинутое</div>
+  <h2>Суперсилы парсинга и медиа</h2>
+  <div class="cols">
+    <div>
+      <div class="card"><h3>🕵 CloakBrowser</h3><p>Антидетект-Chromium: проходит там, где Cloudflare и капча блокируют обычный браузер. Парсит защищённые сайты.</p></div>
+      <div class="card"><h3>📥 yt-dlp</h3><p>Скачивание с YouTube и сотен сайтов. С POT-провайдером обходит «докажи, что не бот».</p></div>
+    </div>
+    <div>
+      <div class="card"><h3>📓 NotebookLM CLI</h3><p>Блокноты Google NotebookLM из терминала: загрузи источники — агент отвечает по ним.</p></div>
+      <div class="card" style="border-color:rgba(246,173,85,.3)"><h3 style="color:var(--warn)">Ставится по желанию</h3><p>Для базового бота не нужно. Всё — на 127.0.0.1, доступ к браузеру и аккаунтам под контролем.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 12 -->
+<section class="slide">
+  <div class="kicker">Фаза 7¾ · любимая</div>
+  <h2>Оживление</h2>
+  <div class="steps">
+    <div class="step"><span><b>Личность — SOUL.md.</b> <span class="dim">Имя, характер, тон. Один файл — и это уже «твой» агент, а не ассистент из коробки.</span></span></div>
+    <div class="step"><span><b>Дом — /sethome.</b> <span class="dim">Чат, куда бот пишет по своей инициативе.</span></span></div>
+    <div class="step"><span><b>Первый крон — просто попроси.</b> <span class="dim">«Каждое утро в 9 присылай план дня» — бот сам создаст себе расписание.</span></span></div>
+    <div class="step"><span><b>Память.</b> <span class="dim">«Запомни это на будущее» — и он помнит. Навсегда.</span></span></div>
+  </div>
+</section>
+
+<!-- 13 -->
+<section class="slide">
+  <div class="kicker">Философия</div>
+  <h2>Агент, который растёт</h2>
+  <ul class="big">
+    <li><b>Память</b> — это «что»: факты о тебе, проектах, договорённостях</li>
+    <li><b>Скиллы</b> — это «как»: пошаговые рецепты, которые агент пишет себе сам</li>
+    <li>Правило: повторил задачу из 5+ шагов дважды → <b>«создай себе скилл»</b></li>
+    <li>Дальше — просто <code>/имя-скилла</code>: неделя работы превращается в команду</li>
+  </ul>
+  <div class="warnbox">Через месяц твой Hermes — не тот, что после установки: он «оброс» твоими скиллами и памятью. Это и есть главное отличие от чат-ботов.</div>
+</section>
+
+<!-- 14 -->
+<section class="slide">
+  <div class="kicker">Экономика</div>
+  <h2>Токены под контролем</h2>
+  <div class="cols">
+    <ul class="big">
+      <li><code>/usage</code> — расход прямо в чате</li>
+      <li><code>/insights</code> — анализ трат за 30 дней</li>
+      <li><code>/compress</code> — ужать длинную сессию</li>
+    </ul>
+    <ul class="big">
+      <li>Бесплатные лапы: Nous <code>:free</code>, OpenRouter <code>:free</code>, Groq</li>
+      <li>Подписки в дело: ChatGPT Plus через Codex OAuth</li>
+      <li>Частая смена модели в сессии = сброс кэша = дороже</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 15 -->
+<section class="slide">
+  <div class="kicker">Безопасность</div>
+  <h2>Правила выживания агента</h2>
+  <ul class="big">
+    <li class="ok">Опасные команды — только с твоего «да» в чате (режим подтверждений)</li>
+    <li class="ok">Доступ к боту — строго вайтлист или pairing-коды</li>
+    <li class="warn">Никогда: «отвечать всем» у бота с доступом к терминалу</li>
+    <li class="ok">Периодически просматривай скиллы, которые агент написал себе сам</li>
+    <li class="ok">Перед обновлением — <code>hermes backup</code>, копию — к себе на компьютер</li>
+    <li>Параноик-режим: команды в Docker-песочнице (<code>terminal.backend: docker</code>)</li>
+  </ul>
+</section>
+
+<!-- 16 -->
+<section class="slide">
+  <div class="kicker">Куда расти</div>
+  <h2>Экосистема</h2>
+  <div class="cols">
+    <div>
+      <div class="card"><h3>Скиллы сообщества</h3><p>awesome-hermes-agent: 40+ готовых скиллов; реестры Hermeshub, skilldock.io, agentskills.io — ставятся в пару команд.</p></div>
+      <div class="card"><h3>MCP-серверы</h3><p>Подключай агенту любые внешние инструменты по Model Context Protocol.</p></div>
+    </div>
+    <div>
+      <div class="card"><h3>Субагенты и профили</h3><p>Делегирование задач параллельным агентам; отдельные профили под работу, семью, проекты.</p></div>
+      <div class="card"><h3>GUI</h3><p>Hermes Desktop и dashboard: наблюдай за агентом из браузера через SSH-туннель.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 17 -->
+<section class="slide">
+  <div class="kicker">Чеклист</div>
+  <h2>Готов, если…</h2>
+  <div class="cols">
+    <ul class="big">
+      <li class="ok">Вход на сервер — только по ключу</li>
+      <li class="ok">Фаервол и fail2ban активны</li>
+      <li class="ok">Бот отвечает в Telegram</li>
+      <li class="ok">Голосовое → понял; «ответь голосом» → сказал</li>
+    </ul>
+    <ul class="big">
+      <li class="ok">«Найди в интернете…» → нашёл</li>
+      <li class="ok">Fallback-модели на месте</li>
+      <li class="ok">Первый крон тикает</li>
+      <li class="ok">Бэкап скачан к себе</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 18 -->
+<section class="slide">
+  <div class="kicker">Финал</div>
+  <h1>Дай агенту скилл<br>и <span class="grad">IP сервера</span>.<br>Остальное он сделает сам.</h1>
+  <p class="sub" style="margin-top:1em">Раздатка: <b>hermes-vps-setup.skill</b> · Документация: hermes-agent.nousresearch.com/docs</p>
+  <div style="margin-top:1.5em">
+    <span class="chip">безопасность</span><span class="chip">telegram</span><span class="chip">голос</span>
+    <span class="chip">поиск</span><span class="chip violet">память</span><span class="chip violet">скиллы</span>
+    <span class="chip violet">кроны</span><span class="chip warn">все грабли учтены ⚠</span>
+  </div>
+</section>
+
+</div>
+
+<div class="clickzone left" id="zl" title="Назад"></div>
+<div class="clickzone right" id="zr" title="Вперёд"></div>
+<div class="foot">
+  <span>Hermes · семинар «Первые автоматизации»</span>
+  <span class="navhint">← → или клик по краям · <span id="counter"></span></span>
+</div>
+
+<script>
+(function(){
+  var slides=[].slice.call(document.querySelectorAll('.slide')),
+      bar=document.getElementById('bar'),
+      counter=document.getElementById('counter'),
+      i=Math.max(0,Math.min(slides.length-1,(parseInt(location.hash.slice(1),10)||1)-1));
+  function show(n){
+    n=Math.max(0,Math.min(slides.length-1,n));
+    slides[i].classList.remove('active');
+    i=n; slides[i].classList.add('active');
+    bar.style.width=((i+1)/slides.length*100)+'%';
+    counter.textContent=(i+1)+' / '+slides.length;
+    history.replaceState(null,'','#'+(i+1));
+  }
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown') show(i+1);
+    else if(e.key==='ArrowLeft'||e.key==='PageUp') show(i-1);
+    else if(e.key==='Home') show(0);
+    else if(e.key==='End') show(slides.length-1);
+  });
+  document.getElementById('zl').addEventListener('click',function(){show(i-1)});
+  document.getElementById('zr').addEventListener('click',function(){show(i+1)});
+  var tx=null;
+  document.addEventListener('touchstart',function(e){tx=e.touches[0].clientX});
+  document.addEventListener('touchend',function(e){
+    if(tx===null)return;
+    var dx=e.changedTouches[0].clientX-tx;
+    if(dx<-40)show(i+1); else if(dx>40)show(i-1);
+    tx=null;
+  });
+  show(i);
+})();
+</script>
+</body>
+</html>
