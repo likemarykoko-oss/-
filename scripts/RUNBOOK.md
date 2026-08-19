@@ -11,23 +11,30 @@
 
 ---
 
+## С чего начать
+
+Владелец работает с iPad. Установка терминала и Фаза 0 — в отдельной инструкции:
+**`docs/ipad-termius.md`**. Сделай её целиком, потом возвращайся сюда к Фазе 1.
+
 ## Как доставить скрипты на сервер
 
-На сервере (веб-консоль хостера или SSH):
+Репозиторий публичный, авторизация не нужна:
 
 ```bash
-apt-get update && apt-get -y install git
-git clone https://github.com/likemarykoko-oss/- /opt/hermes-setup
-cd /opt/hermes-setup && git checkout claude/hermes-server-setup-ycayqd
-cd scripts
+cd /root
+curl -fsSLO https://raw.githubusercontent.com/likemarykoko-oss/-/claude/hermes-server-setup-ycayqd/scripts/{00-check,10-base,20-security,30-hermes,set-env}.sh
+chmod +x *.sh && ls -1 *.sh
 ```
 
-Если репозиторий приватный и git с сервера не пускает — открой нужный скрипт на
-GitHub, скопируй содержимое и вставь на сервере через `cat > 10-base.sh <<'EOF' ... EOF`.
+Все команды ниже выполняются из `/root`, где лежат скрипты.
 
 ---
 
 ## Фаза 0 — доступ по SSH-ключу
+
+> **С iPad:** этот раздел не применяй — там нет локального терминала.
+> Используй `docs/ipad-termius.md`, ключ генерируется прямо в Termius.
+> Ниже — вариант для Mac / Linux / Windows.
 
 **Шаг 0.1 — на СВОЕЙ машине** (не на сервере), создай ключ:
 
