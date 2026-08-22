@@ -32,7 +32,7 @@ Hermes Agent (Nous Research), open-source AI-агент. Установлен п
 | 4 | Мозг: LLM-провайдеры + fallback-цепочка | ✅ |
 | 5 | Telegram-бот | ✅ |
 | 6 | Голос: STT (Groq Whisper) + TTS (edge-tts) | ✅ |
-| 7 | Веб-поиск и парсинг | ⏳ в работе |
+| 7 | Веб-поиск и парсинг | ✅ |
 | 8 | SOUL.md, домашний канал, первый крон | частично (`/sethome` сделан) |
 | 9 | Финальная проверка, бэкап, отчёт | ⏳ (промежуточный бэкап был один раз) |
 
@@ -109,18 +109,28 @@ python-telegram-bot 22.8 · tmux 3.6 · faster-whisper 1.2.1
 
 ## План фаз 7–9
 
-### Фаза 7 — веб-поиск и парсинг (`references/web-tools.md`)
+### Фаза 7 — веб-поиск и парсинг ✅ ЗАВЕРШЕНО
 
-0. **Сначала проверить, что уже стоит:** `hermes config get web.search_backend`.
-   Косвенный признак из Фазы 6: бот сам сходил в веб за погодой без настройки — какой-то бэкенд уже активен.
-1. Brave Search (основной поиск): ключ на brave.com/search/api (Free, 2000 запросов/мес)
-   → `.env: BRAVE_SEARCH_API_KEY=...` → `hermes config set web.search_backend brave-free` → restart gateway.
-   Проверка: `hermes -z 'Найди в вебе последнюю LTS-версию Ubuntu и назови её'`.
-2. Fallback без ключа: `ddgs` (DuckDuckGo) — `python -m pip install ddgs` в venv, `hermes config set web.search_backend ddgs`.
-3. Firecrawl (извлечение контента страниц): ключ на firecrawl.dev (free tier)
-   → `.env: FIRECRAWL_API_KEY=...` → `hermes config set web.extract_backend firecrawl` → restart.
-   Проверка: попросить бота прочитать конкретный URL и пересказать.
-4. Бесплатная альтернатива extract без ключа: Jina Reader, `curl https://r.jina.ai/<url>`.
+Оказалось, что `web search` и `web extract` уже работали из коробки — это встроенный
+в сам Hermes npm-пакет (`web` workspace), не Python-зависимость, поэтому в venv его не видно
+через `pip list`. Подтверждено `hermes doctor`: `✓ web search (parallel)`, `✓ web extract (parallel)`.
+**Brave и Firecrawl регистрировать не понадобилось** — ключи `BRAVE_SEARCH_API_KEY` /
+`FIRECRAWL_API_KEY` не заводились и не нужны.
+
+Живой смоук пройден: `hermes -z 'Найди в вебе последнюю LTS-версию Ubuntu и назови её'`
+→ корректный ответ с реальным источником (releases.ubuntu.com).
+
+**Известное ограничение (не блокер, чинить отдельно при желании):**
+`browser` и `browser-cdp` (Playwright/agent-browser для JS-тяжёлых страниц) помечены
+в `hermes doctor` как `system dependency not met`. Причина: Playwright 1.58.2 официально
+ещё не поддерживает Ubuntu 26.04 и отказывается сам ставить зависимости
+(`Cannot install dependencies for ubuntu26.04-x64 with Playwright 1.58.2!`).
+Решено не чинить руками (риск сломать систему на 1 CPU/2 ГБ ради необязательной фичи —
+обычные `web search`/`web extract` её не используют). Вернуться к этому, когда Playwright
+добавит поддержку Ubuntu 26.04.
+
+Также замечено (не срочно): `web workspace has 4 npm vulnerabilities`, `ui-tui workspace has 3` —
+по словам `hermes doctor` это build-tool advisory, не runtime, чинится бампом lockfile.
 
 ### Фаза 8 — личность, дом, крон (`SKILL.md`)
 
