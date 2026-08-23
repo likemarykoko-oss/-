@@ -1,0 +1,35 @@
+{
+  "_как_пользоваться": "Меняй числа и цвета — скрипт трогать не нужно. size — размер букв, stroke_w — толщина обводки, box — цвет плашки под текстом (null = без плашки), line_gap — расстояние между строками, width — сколько процентов ширины экрана занимает текст, case — upper (КАПСОМ), lower или none.",
+  "presets": {
+    "hook": {
+      "font": "Unbounded", "size": 92, "fill": "#FFFFFF",
+      "stroke": "#000000", "stroke_w": 8, "box": null,
+      "line_gap": 1.15, "width": 84, "case": "none"
+    },
+    "sub": {
+      "font": "Unbounded", "size": 58, "fill": "#FFFFFF",
+      "stroke": "#000000", "stroke_w": 5, "box": null,
+      "line_gap": 1.2, "width": 84, "case": "upper"
+    },
+    "plate": {
+      "font": "Unbounded", "size": 64, "fill": "#111111",
+      "stroke": null, "stroke_w": 0, "box": "#FFE24D",
+      "line_gap": 1.25, "width": 78, "case": "none"
+    },
+    "quote": {
+      "font": "CormorantGaramond-Italic", "size": 96, "fill": "#FFFFFF",
+      "stroke": "#000000", "stroke_w": 4, "box": null,
+      "line_gap": 1.1, "width": 80, "case": "none"
+    },
+    "code": {
+      "font": "JetBrainsMono", "size": 46, "fill": "#8CFF9E",
+      "stroke": "#000000", "stroke_w": 4, "box": "#0D0D0D",
+      "line_gap": 1.35, "width": 88, "case": "none"
+    },
+    "clean": {
+      "font": "Onest", "size": 72, "fill": "#FFFFFF",
+      "stroke": "#000000", "stroke_w": 6, "box": null,
+      "line_gap": 1.2, "width": 84, "case": "none"
+    }
+  }
+}
