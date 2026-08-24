@@ -85,6 +85,29 @@ if (Have 'python') {
     Bad 'без Python библиотеки не поставить'
 }
 
+# Навык вызывает `python3`, которого на Windows нет: `python3.exe` в WindowsApps —
+# это заглушка Microsoft Store. Кладём переходник, чтобы команды из SKILL.md
+# работали как написано.
+if (Have 'python') {
+    $py3 = Get-Command 'python3' -ErrorAction SilentlyContinue
+    $isStub = $py3 -and ($py3.Source -like '*\WindowsApps\*')
+    if ((-not $py3) -or $isStub) {
+        try {
+            $bin = Join-Path $tools 'bin'
+            New-Item -ItemType Directory -Force -Path $bin | Out-Null
+            $shim = Join-Path $bin 'python3.cmd'
+            Set-Content -Path $shim -Value "@echo off`r`npython %*" -Encoding ASCII
+            Add-UserPath $bin
+            Ok 'переходник python3 -> python'
+        } catch {
+            Bad "переходник python3 не создался: $($_.Exception.Message)"
+            [void]$missing.Add('python3 -> в командах навыка пишите python вместо python3')
+        }
+    } else {
+        Ok 'python3'
+    }
+}
+
 # ── 4. Whisper ──────────────────────────────────────────────────────────────
 Head 'Whisper (распознавание речи)'
 if (Have 'whisper-cli') {
