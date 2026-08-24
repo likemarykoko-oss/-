@@ -14,14 +14,27 @@
 Дальше на base.mp4 накладываются анимированные карточки, а speech.srt даёт
 тайминги, к которым они привязываются.
 """
-import argparse, os, re, subprocess, sys, tempfile
+import argparse, ctypes, os, re, subprocess, sys, tempfile
 
 W, H, AIR = 1080, 1920, 0.10
 MODEL = os.path.expanduser("~/.claude/models/ggml-small.bin")
 
 
+def short_path(p):
+    """whisper-cli разбирает argv как ANSI и ломает кириллицу в пути. Подсовываем
+    короткий 8.3-путь Windows для директории — сам файл может ещё не существовать.
+    Если короткие имена на томе отключены, вернётся исходный путь."""
+    if os.name != "nt":
+        return p
+    d, b = os.path.split(p)
+    buf = ctypes.create_unicode_buffer(260)
+    n = ctypes.windll.kernel32.GetShortPathNameW(d, buf, 260)
+    return os.path.join(buf.value, b) if n else p
+
+
 def run(cmd, **kw):
-    return subprocess.run(cmd, capture_output=True, text=True, **kw)
+    return subprocess.run(cmd, capture_output=True, text=True,
+                          encoding="utf-8", errors="replace", **kw)
 
 
 def duration(path):
@@ -32,11 +45,12 @@ def duration(path):
 def transcribe(src, out_srt):
     if not os.path.exists(MODEL):
         sys.exit(f"нет модели распознавания: {MODEL}\n"
-                 f"поставь: brew install whisper-cpp, затем скажи Claude «скачай модель small для whisper»")
+                 f"скажи Claude «скачай модель small для whisper»")
     wav = os.path.join(tempfile.mkdtemp(), "a.wav")
     run(["ffmpeg", "-y", "-i", src, "-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", wav])
     base = os.path.splitext(out_srt)[0]
-    r = run(["whisper-cli", "-m", MODEL, "-l", "ru", "-f", wav, "-osrt", "-of", base])
+    r = run(["whisper-cli", "-m", short_path(MODEL), "-l", "ru",
+             "-f", short_path(wav), "-osrt", "-of", short_path(base)])
     if not os.path.exists(out_srt):
         sys.stderr.write(r.stderr[-1500:]); sys.exit("распознавание не удалось")
     return out_srt
