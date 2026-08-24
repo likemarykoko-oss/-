@@ -1,0 +1,27 @@
+<!-- СЧЁТЧИК: цифра крутится от нуля. Ставить ровно на слова с числом.
+     Анимация: count-up (from 0 to N за 1.5 сек) + pop(glass). Самая цепляющая карточка. -->
+<div class="card" data-card-id="card-count">
+<style>
+    .card[data-card-id="card-count"] .root { width:100%; height:100%; background:transparent;
+      display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:0 40px; }
+    .card[data-card-id="card-count"] .kick { font-family:'Onest',sans-serif; font-size:26px; letter-spacing:.18em;
+      text-transform:uppercase; color:#fff; opacity:.92; }
+    .card[data-card-id="card-count"] .big { font-family:'Oswald',sans-serif; font-weight:700; font-size:300px;
+      line-height:.95; text-transform:uppercase; color:#fff;
+      text-shadow:0 10px 34px rgba(0,0,0,.75), 0 2px 8px rgba(0,0,0,.9); }
+    .card[data-card-id="card-count"] .script { font-family:'Caveat',cursive; font-size:68px; color:#fff;
+      text-shadow:0 6px 22px rgba(0,0,0,.92); }
+    .card[data-card-id="card-count"] .glass { background:rgba(10,10,12,.62); border:1px solid rgba(255,255,255,.10);
+      border-radius:28px; padding:34px 36px; box-shadow:0 24px 60px rgba(0,0,0,.55); }
+    .card[data-card-id="card-count"] .accent { color:var(--accent-1); }
+    .card[data-card-id="card-count"] .char { display:inline-block; }
+</style>
+  <div class="root">
+    <div class="glass" id="card-count-glass" style="padding:54px 60px;">
+      <div class="kick">{{ПОДПИСЬ СВЕРХУ}}</div>
+      <div class="big" id="card-count-num" style="color:var(--accent-0);">0</div>
+      <div class="big" style="font-size:76px;">{{ЕДИНИЦЫ}}</div>
+      <div class="script" id="card-count-script" style="font-size:58px;">{{за сколько}}</div>
+    </div>
+  </div>
+</div>

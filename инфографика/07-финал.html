@@ -1,0 +1,23 @@
+<!-- ФИНАЛ: последняя мысль и призыв. Держать до конца ролика.
+     Анимация: chars(title) + slide(script). Один призыв, не три. -->
+<div class="card" data-card-id="card-final">
+<style>
+    .card[data-card-id="card-final"] .root { width:100%; height:100%; background:transparent;
+      display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:0 40px; }
+    .card[data-card-id="card-final"] .kick { font-family:'Onest',sans-serif; font-size:26px; letter-spacing:.18em;
+      text-transform:uppercase; color:#fff; opacity:.92; }
+    .card[data-card-id="card-final"] .big { font-family:'Oswald',sans-serif; font-weight:700; font-size:130px;
+      line-height:.95; text-transform:uppercase; color:#fff;
+      text-shadow:0 10px 34px rgba(0,0,0,.75), 0 2px 8px rgba(0,0,0,.9); }
+    .card[data-card-id="card-final"] .script { font-family:'Caveat',cursive; font-size:68px; color:#fff;
+      text-shadow:0 6px 22px rgba(0,0,0,.92); }
+    .card[data-card-id="card-final"] .glass { background:rgba(10,10,12,.62); border:1px solid rgba(255,255,255,.10);
+      border-radius:28px; padding:34px 36px; box-shadow:0 24px 60px rgba(0,0,0,.55); }
+    .card[data-card-id="card-final"] .accent { color:var(--accent-1); }
+    .card[data-card-id="card-final"] .char { display:inline-block; }
+</style>
+  <div class="root">
+    <div class="big" id="card-final-title">{{ФИНАЛЬНАЯ МЫСЛЬ}}<br><span class="accent">{{АКЦЕНТ}}</span></div>
+    <div class="script" id="card-final-script" style="margin-top:12px;">{{призыв}}</div>
+  </div>
+</div>

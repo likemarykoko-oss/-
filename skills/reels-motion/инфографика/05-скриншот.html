@@ -1,0 +1,25 @@
+<!-- СКРИНШОТ: доказательство словам. Файл кладётся в media/ рядом с роликом.
+     Анимация: pop(glass) + медленный наезд scale 1 → 1.06 на всё время карточки. -->
+<div class="card" data-card-id="card-shot">
+<style>
+    .card[data-card-id="card-shot"] .root { width:100%; height:100%; background:transparent;
+      display:flex; flex-direction:column; justify-content:center; padding:0 40px; }
+    .card[data-card-id="card-shot"] .kick { font-family:'Onest',sans-serif; font-size:26px; letter-spacing:.18em;
+      text-transform:uppercase; color:#fff; opacity:.92; }
+    .card[data-card-id="card-shot"] .big { font-family:'Oswald',sans-serif; font-weight:700; font-size:64px;
+      line-height:.95; text-transform:uppercase; color:#fff;
+      text-shadow:0 10px 34px rgba(0,0,0,.75), 0 2px 8px rgba(0,0,0,.9); }
+    .card[data-card-id="card-shot"] .script { font-family:'Caveat',cursive; font-size:68px; color:#fff;
+      text-shadow:0 6px 22px rgba(0,0,0,.92); }
+    .card[data-card-id="card-shot"] .glass { background:rgba(10,10,12,.62); border:1px solid rgba(255,255,255,.10);
+      border-radius:28px; padding:34px 36px; box-shadow:0 24px 60px rgba(0,0,0,.55); }
+    .card[data-card-id="card-shot"] .accent { color:var(--accent-1); }
+    .card[data-card-id="card-shot"] .char { display:inline-block; }
+</style>
+  <div class="root">
+    <div class="glass" id="card-shot-glass" style="padding:18px;">
+      <img src="media/{{ИМЯ-ФАЙЛА.png}}" style="width:100%;border-radius:18px;display:block;">
+      <div class="kick" style="margin-top:14px;">{{ПОДПИСЬ ПОД СКРИНШОТОМ}}</div>
+    </div>
+  </div>
+</div>
