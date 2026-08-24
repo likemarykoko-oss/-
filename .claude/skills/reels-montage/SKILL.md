@@ -11,13 +11,24 @@ description: Простой монтаж вертикальных роликов
 
 ## Перед первым запуском
 
+macOS и Linux:
 ```bash
 bash ~/.claude/skills/reels-montage/scripts/setup.sh
+```
+
+Windows (PowerShell):
+```powershell
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\skills\reels-montage\scripts\setup.ps1"
 ```
 
 Ставит ffmpeg, Pillow, fontTools и распознавание речи, потом скачивает модель.
 Делается один раз, занимает несколько минут. Скажи человеку одной строкой,
 что ставишь программы для монтажа, и просто сделай это — команды показывать не нужно.
+
+**На Windows команда называется `python`, а не `python3`** — во всех примерах ниже
+подставляй `python`. Путь к скриптам там же:
+`%USERPROFILE%\.claude\skills\reels-montage\scripts`.
+Если после установки ffmpeg не находится — он появится только в новом окне терминала.
 
 Проверить, чего не хватает, без установки:
 ```bash

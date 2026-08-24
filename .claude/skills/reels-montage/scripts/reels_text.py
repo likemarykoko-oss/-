@@ -25,7 +25,9 @@ SAFE_TOP, SAFE_BOTTOM = int(H * 0.10), int(H * 0.18)   # верх — ник, н
 
 SYSTEM_FONT_DIRS = ["/System/Library/Fonts/Supplemental", "/Library/Fonts",
                     os.path.expanduser("~/Library/Fonts"),
-                    "/usr/share/fonts", "/usr/local/share/fonts"]
+                    "/usr/share/fonts", "/usr/local/share/fonts",
+                    os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts"),
+                    os.path.expanduser("~/AppData/Local/Microsoft/Windows/Fonts")]
 
 
 # ── шрифты ───────────────────────────────────────────────────────────────────

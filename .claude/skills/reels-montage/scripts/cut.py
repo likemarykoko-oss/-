@@ -31,7 +31,10 @@ def main():
         pieces.append(p)
 
     lst = os.path.join(tmp, "list.txt")
-    open(lst, "w").write("".join(f"file '{p}'\n" for p in pieces))
+    # UTF-8 и прямые слэши: на Windows временная папка лежит внутри профиля,
+    # а имя пользователя может быть кириллицей — иначе ffmpeg не найдёт куски.
+    with open(lst, "w", encoding="utf-8") as f:
+        f.write("".join("file '%s'\n" % x.replace("\\", "/") for x in pieces))
     subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
                     "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", a.dst], check=True)
     print("готово:", a.dst, f"({len(parts)} кусков)")
