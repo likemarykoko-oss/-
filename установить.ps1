@@ -83,14 +83,9 @@ if (-not $winget) {
     Note "без него программы придётся ставить вручную"
 }
 
-function Ensure-Tool($cmd, $wingetId, $human) {
-    if (Have $cmd) { Ok $human; return }
-    if (-not $winget) {
-        Bad "$human — нет"
-        [void]$missing.Add("$human -> winget install --id $wingetId -e")
-        return
-    }
-    Note "ставлю $human ..."
+function Try-Winget($wingetId, $cmd, $human) {
+    if (-not $winget) { return $false }
+    Note "ставлю $human через winget ..."
     $log = Join-Path $work "winget-$cmd.log"
     try {
         winget install --id $wingetId -e --accept-source-agreements --accept-package-agreements 2>&1 |
@@ -99,18 +94,86 @@ function Ensure-Tool($cmd, $wingetId, $human) {
         $_.Exception.Message | Out-File -FilePath $log -Encoding UTF8
     }
     Refresh-Path
-    if (Have $cmd) {
-        Ok $human
-    } else {
-        Bad "$human — не встал, вот что ответил winget:"
-        Show-Tail $log 6
+    if (Have $cmd) { return $true }
+    Note "winget не справился, вот его ответ:"
+    Show-Tail $log 4
+    return $false
+}
+
+# Распаковывает архив в $tools\<name> и добавляет в PATH папку, где лежит $exeName.
+function Install-Zip($url, $name, $exeName) {
+    $zip = Join-Path $work "$name.zip"
+    $dir = Join-Path $tools $name
+    if (Test-Path $zip) { Remove-Item $zip -Force }
+    Invoke-WebRequest $url -OutFile $zip
+    if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
+    Remove-Item $zip -Force
+    $exe = Get-ChildItem -LiteralPath $dir -Filter $exeName -Recurse | Select-Object -First 1
+    if (-not $exe) { throw "в архиве нет $exeName" }
+    Add-UserPath $exe.Directory.FullName
+    return $exe.Directory.FullName
+}
+
+function Install-NodeDirect {
+    $base = 'https://nodejs.org/dist/latest-v22.x/'
+    $sums = (Invoke-WebRequest ($base + 'SHASUMS256.txt') -UseBasicParsing).Content
+    $m = [regex]::Match($sums, 'node-v[\d.]+-win-x64\.zip')
+    if (-not $m.Success) { throw 'не нашёл node-*-win-x64.zip в списке версий' }
+    Note "скачиваю $($m.Value) ..."
+    return (Install-Zip ($base + $m.Value) 'node' 'node.exe')
+}
+
+function Install-FfmpegDirect {
+    Note 'скачиваю ffmpeg-release-essentials.zip ...'
+    return (Install-Zip 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip' 'ffmpeg' 'ffmpeg.exe')
+}
+
+function Install-PythonDirect {
+    # У 3.12 свежие выпуски идут только исходниками, установщика для Windows нет.
+    foreach ($v in @('3.13.9', '3.13.8', '3.12.10')) {
+        $url = "https://www.python.org/ftp/python/$v/python-$v-amd64.exe"
+        try { $head = Invoke-WebRequest $url -Method Head -UseBasicParsing } catch { continue }
+        if ($head.StatusCode -ne 200) { continue }
+        $exe = Join-Path $work "python-$v-amd64.exe"
+        Note "скачиваю Python $v ..."
+        Invoke-WebRequest $url -OutFile $exe
+        Note 'ставлю, окна не будет — это тихая установка ...'
+        Start-Process -FilePath $exe -Wait -ArgumentList @(
+            '/quiet', 'InstallAllUsers=0', 'PrependPath=1', 'Include_pip=1', 'Include_launcher=1'
+        )
+        Remove-Item $exe -Force -ErrorAction SilentlyContinue
+        Refresh-Path
+        return $v
+    }
+    throw 'не нашёл установщик Python на python.org'
+}
+
+# winget на многих машинах отсутствует или молча отказывает, поэтому за ним
+# идёт запасной путь — прямая загрузка с сайта проекта.
+function Ensure-Tool($cmd, $wingetId, $human, $fallback) {
+    if (Have $cmd) { Ok $human; return }
+    if (Try-Winget $wingetId $cmd $human) { Ok $human; return }
+    try {
+        $where = & $fallback
+        Refresh-Path
+        if (Have $cmd) {
+            Ok "$human (скачан напрямую)"
+            if ($where) { Note $where }
+            return
+        }
+        Bad "$human — файлы легли, но команда не отвечает в этом окне"
+        [void]$missing.Add("$human -> закройте окно, откройте PowerShell заново и запустите скрипт ещё раз")
+    } catch {
+        Bad "$human — не встал: $($_.Exception.Message)"
         [void]$missing.Add("$human -> winget install --id $wingetId -e")
     }
 }
 
-Ensure-Tool 'node'    'OpenJS.NodeJS.LTS'  'Node.js'
-Ensure-Tool 'ffmpeg'  'Gyan.FFmpeg'        'ffmpeg'
-Ensure-Tool 'python'  'Python.Python.3.12' 'Python'
+Ensure-Tool 'node'   'OpenJS.NodeJS.LTS'  'Node.js' ${function:Install-NodeDirect}
+Ensure-Tool 'ffmpeg' 'Gyan.FFmpeg'        'ffmpeg'  ${function:Install-FfmpegDirect}
+Ensure-Tool 'python' 'Python.Python.3.13' 'Python'  ${function:Install-PythonDirect}
 
 # ── 3. Библиотеки Python ────────────────────────────────────────────────────
 Head 'Библиотеки Python'
