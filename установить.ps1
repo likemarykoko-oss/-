@@ -5,19 +5,31 @@
 
 $ProgressPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
+try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
 
 $root   = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $claude = Join-Path $env:USERPROFILE '.claude'
 $skills = Join-Path $claude 'skills'
 $models = Join-Path $claude 'models'
 $tools  = Join-Path $claude 'tools'
+# Своя рабочая папка вместо $env:TEMP: при кириллице в имени пользователя
+# TEMP подставляется коротким именем вида C:\Users\75BD~1, которого может не быть.
+$work   = Join-Path $claude 'tmp'
 $missing = New-Object System.Collections.ArrayList
 
-function Note($text)  { Write-Host "  $text" }
-function Ok($text)    { Write-Host "  [ok] $text" -ForegroundColor Green }
-function Bad($text)   { Write-Host "  [--] $text" -ForegroundColor Yellow }
-function Head($text)  { Write-Host ""; Write-Host "== $text ==" -ForegroundColor Cyan }
-function Have($cmd)   { return [bool](Get-Command $cmd -ErrorAction SilentlyContinue) }
+function Note($text) { Write-Host "  $text" }
+function Ok($text)   { Write-Host "  [ok] $text" -ForegroundColor Green }
+function Bad($text)  { Write-Host "  [--] $text" -ForegroundColor Yellow }
+function Head($text) { Write-Host ""; Write-Host "== $text ==" -ForegroundColor Cyan }
+
+# python.exe и python3.exe в WindowsApps — заглушки, открывающие Microsoft Store.
+# Get-Command их находит, но запустить нельзя, поэтому считаем, что команды нет.
+function Have($cmd) {
+    $c = Get-Command $cmd -ErrorAction SilentlyContinue
+    if (-not $c) { return $false }
+    if ($c.Source -and $c.Source -like '*\WindowsApps\*' -and $c.Source -like '*python*') { return $false }
+    return $true
+}
 
 function Refresh-Path {
     $m = [Environment]::GetEnvironmentVariable('Path', 'Machine')
@@ -33,12 +45,22 @@ function Add-UserPath($dir) {
     Refresh-Path
 }
 
+function Show-Tail($file, $count) {
+    if (Test-Path $file) {
+        Get-Content $file -Tail $count -ErrorAction SilentlyContinue |
+            ForEach-Object { Note "     | $_" }
+    }
+}
+
+New-Item -ItemType Directory -Force -Path $work | Out-Null
+
 # ── 1. Навык ────────────────────────────────────────────────────────────────
 Head 'Навык'
 $src = Join-Path $root 'skills\reels-motion'
 if (-not (Test-Path $src)) {
     Bad "не нашёл папку skills\reels-motion рядом со скриптом"
-    Note "запускайте установить.ps1 из распакованной папки комплекта"
+    Note "скрипт лежит в: $root"
+    Note "запускайте установить.ps1 из той папки комплекта, где видно папку skills"
     exit 1
 }
 try {
@@ -55,7 +77,7 @@ try {
 
 # ── 2. Программы ────────────────────────────────────────────────────────────
 Head 'Программы'
-$winget = Have 'winget'
+$winget = [bool](Get-Command 'winget' -ErrorAction SilentlyContinue)
 if (-not $winget) {
     Bad "нет winget — поставьте «Установщик приложений» из Microsoft Store"
     Note "без него программы придётся ставить вручную"
@@ -63,11 +85,27 @@ if (-not $winget) {
 
 function Ensure-Tool($cmd, $wingetId, $human) {
     if (Have $cmd) { Ok $human; return }
-    if (-not $winget) { Bad "$human — нет"; [void]$missing.Add("$human"); return }
+    if (-not $winget) {
+        Bad "$human — нет"
+        [void]$missing.Add("$human -> winget install --id $wingetId -e")
+        return
+    }
     Note "ставлю $human ..."
-    winget install --id $wingetId -e --silent --accept-source-agreements --accept-package-agreements | Out-Null
+    $log = Join-Path $work "winget-$cmd.log"
+    try {
+        winget install --id $wingetId -e --accept-source-agreements --accept-package-agreements 2>&1 |
+            Out-File -FilePath $log -Encoding UTF8
+    } catch {
+        $_.Exception.Message | Out-File -FilePath $log -Encoding UTF8
+    }
     Refresh-Path
-    if (Have $cmd) { Ok $human } else { Bad "$human — не встал, поставьте вручную"; [void]$missing.Add($human) }
+    if (Have $cmd) {
+        Ok $human
+    } else {
+        Bad "$human — не встал, вот что ответил winget:"
+        Show-Tail $log 6
+        [void]$missing.Add("$human -> winget install --id $wingetId -e")
+    }
 }
 
 Ensure-Tool 'node'    'OpenJS.NodeJS.LTS'  'Node.js'
@@ -77,26 +115,33 @@ Ensure-Tool 'python'  'Python.Python.3.12' 'Python'
 # ── 3. Библиотеки Python ────────────────────────────────────────────────────
 Head 'Библиотеки Python'
 if (Have 'python') {
-    python -m pip install --quiet --user --upgrade pillow fonttools brotli 2>&1 | Out-Null
-    python -c "import PIL, fontTools, brotli" 2>$null
-    if ($LASTEXITCODE -eq 0) { Ok 'Pillow, fontTools, brotli' }
-    else { Bad 'Pillow не встал'; [void]$missing.Add('Pillow -> python -m pip install --user pillow fonttools brotli') }
-} else {
-    Bad 'без Python библиотеки не поставить'
-}
+    $pipLog = Join-Path $work 'pip.log'
+    $pipOk = $false
+    foreach ($extra in @('--user', '')) {
+        $cmdArgs = @('-m', 'pip', 'install', '--quiet', '--upgrade')
+        if ($extra) { $cmdArgs += $extra }
+        $cmdArgs += @('pillow', 'fonttools', 'brotli')
+        & python $cmdArgs 2>&1 | Out-File -FilePath $pipLog -Append -Encoding UTF8
+        & python -c "import PIL, fontTools, brotli" 2>$null
+        if ($LASTEXITCODE -eq 0) { $pipOk = $true; break }
+    }
+    if ($pipOk) {
+        Ok 'Pillow, fontTools, brotli'
+    } else {
+        Bad 'Pillow не встал, вот что ответил pip:'
+        Show-Tail $pipLog 6
+        [void]$missing.Add('Pillow -> python -m pip install --user pillow fonttools brotli')
+    }
 
-# Навык вызывает `python3`, которого на Windows нет: `python3.exe` в WindowsApps —
-# это заглушка Microsoft Store. Кладём переходник, чтобы команды из SKILL.md
-# работали как написано.
-if (Have 'python') {
+    # Навык вызывает `python3`, которого на Windows нет. Кладём переходник,
+    # чтобы команды из SKILL.md работали как написано.
     $py3 = Get-Command 'python3' -ErrorAction SilentlyContinue
     $isStub = $py3 -and ($py3.Source -like '*\WindowsApps\*')
     if ((-not $py3) -or $isStub) {
         try {
             $bin = Join-Path $tools 'bin'
             New-Item -ItemType Directory -Force -Path $bin | Out-Null
-            $shim = Join-Path $bin 'python3.cmd'
-            Set-Content -Path $shim -Value "@echo off`r`npython %*" -Encoding ASCII
+            Set-Content -Path (Join-Path $bin 'python3.cmd') -Value "@echo off`r`npython %*" -Encoding ASCII
             Add-UserPath $bin
             Ok 'переходник python3 -> python'
         } catch {
@@ -106,6 +151,9 @@ if (Have 'python') {
     } else {
         Ok 'python3'
     }
+} else {
+    Bad 'без Python библиотеки не поставить'
+    [void]$missing.Add('Pillow -> сначала Python, потом python -m pip install --user pillow fonttools brotli')
 }
 
 # ── 4. Whisper ──────────────────────────────────────────────────────────────
@@ -119,19 +167,22 @@ if (Have 'whisper-cli') {
         $asset = $rel.assets | Where-Object { $_.name -eq 'whisper-bin-x64.zip' } | Select-Object -First 1
         if (-not $asset) { throw "в релизе $($rel.tag_name) нет whisper-bin-x64.zip" }
 
-        $zip = Join-Path $env:TEMP 'whisper-bin-x64.zip'
+        $zip = Join-Path $work 'whisper-bin-x64.zip'
         $dir = Join-Path $tools 'whisper'
         Note "скачиваю $($rel.tag_name) ..."
+        if (Test-Path $zip) { Remove-Item $zip -Force }
         Invoke-WebRequest $asset.browser_download_url -OutFile $zip
         if (Test-Path $dir) { Remove-Item -Recurse -Force $dir }
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
-        Expand-Archive -Path $zip -DestinationPath $dir -Force
+        Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
         Remove-Item $zip -Force
 
-        $exe = Get-ChildItem -Path $dir -Filter 'whisper-cli.exe' -Recurse | Select-Object -First 1
+        $exe = Get-ChildItem -LiteralPath $dir -Filter 'whisper-cli.exe' -Recurse |
+               Select-Object -First 1
         if (-not $exe) { throw 'в архиве нет whisper-cli.exe' }
         Add-UserPath $exe.Directory.FullName
-        if (Have 'whisper-cli') { Ok 'whisper-cli' } else { Ok "whisper-cli ($($exe.Directory.FullName))" }
+        Ok "whisper-cli"
+        Note $exe.Directory.FullName
     } catch {
         Bad "whisper не встал: $($_.Exception.Message)"
         [void]$missing.Add('whisper -> скачайте whisper-bin-x64.zip со страницы релизов ggml-org/whisper.cpp')
@@ -143,6 +194,7 @@ Head 'Модель распознавания'
 $model = Join-Path $models 'ggml-small.bin'
 if ((Test-Path $model) -and ((Get-Item $model).Length -gt 100MB)) {
     Ok 'ggml-small.bin уже на месте'
+    Note $model
 } else {
     try {
         New-Item -ItemType Directory -Force -Path $models | Out-Null
@@ -158,12 +210,34 @@ if ((Test-Path $model) -and ((Get-Item $model).Length -gt 100MB)) {
     }
 }
 
+# ── Проверка ────────────────────────────────────────────────────────────────
+Head 'Проверка'
+foreach ($pair in @(@('node','--version'), @('ffmpeg','-version'), @('python','--version'))) {
+    $c = $pair[0]
+    if (Have $c) {
+        $out = (& $c $pair[1] 2>$null | Select-Object -First 1)
+        Ok "$c — $out"
+    } else {
+        Bad "$c — не отвечает"
+    }
+}
+# whisper-cli печатает справку в stderr, поэтому просто показываем, где он лежит
+$wc = Get-Command 'whisper-cli' -ErrorAction SilentlyContinue
+if ($wc) { Ok "whisper-cli — $($wc.Source)" } else { Bad 'whisper-cli — не отвечает' }
+if (Test-Path $model) { Ok "модель — $([math]::Round((Get-Item $model).Length/1MB)) МБ" }
+else { Bad 'модель ggml-small.bin — нет' }
+
 # ── Итог ────────────────────────────────────────────────────────────────────
 if ($missing.Count -gt 0) {
     Head 'Не хватает'
     foreach ($m in $missing) { Note $m }
     Note ''
-    Note 'Или скажите Claude: «проверь, что нужно для навыка reels-motion, и установи»'
+    Note 'Закройте это окно, откройте PowerShell заново и запустите скрипт ещё раз —'
+    Note 'часть программ появляется в PATH только в новом окне.'
+    Note 'Не помогло — скажите Claude: «проверь, что нужно для навыка reels-motion, и установи»'
+} else {
+    Head 'Всё на месте'
+    Note 'Программы, навык и модель установлены.'
 }
 
 Head 'Последний шаг: плагины'
