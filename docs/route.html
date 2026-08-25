@@ -1,0 +1,424 @@
+<title>Маршрут агента КО-КО</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@500;700&display=swap">
+
+<style>
+:root{
+  --ground:#FBF8F7; --surface:#FFFFFF; --surface-2:#F5F0EE;
+  --ink:#1F1A19; --ink-2:#6E605C; --line:#E6DCD9;
+  --accent:#B8342A; --accent-soft:#F7E8E5; --accent-ink:#8E271F;
+  --ok:#2E6F4E; --warn:#8F5D0C;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#15110F; --surface:#1D1817; --surface-2:#241E1C;
+    --ink:#F2EBE8; --ink-2:#A79792; --line:#372E2B;
+    --accent:#FF7C68; --accent-soft:#3A211D; --accent-ink:#FF9B8A;
+    --ok:#74C295; --warn:#DFA84F;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#15110F; --surface:#1D1817; --surface-2:#241E1C;
+  --ink:#F2EBE8; --ink-2:#A79792; --line:#372E2B;
+  --accent:#FF7C68; --accent-soft:#3A211D; --accent-ink:#FF9B8A;
+  --ok:#74C295; --warn:#DFA84F;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:"Golos Text","Segoe UI",system-ui,sans-serif;
+  font-size:17px; line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1000px;margin:0 auto;padding:0 22px 96px}
+.col{max-width:680px}
+
+/* head */
+.head{padding:64px 0 40px;border-bottom:1px solid var(--line);margin-bottom:52px}
+.eyebrow{
+  font-size:.72rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--accent-ink);margin:0 0 18px
+}
+h1{
+  font-family:Unbounded,"Golos Text",sans-serif;font-weight:700;
+  font-size:clamp(2rem,5.4vw,3rem);line-height:1.06;letter-spacing:-.02em;
+  margin:0 0 18px;text-wrap:balance
+}
+.stand{font-size:1.16rem;color:var(--ink-2);margin:0 0 26px;max-width:56ch}
+.meta{display:flex;flex-wrap:wrap;gap:8px}
+.chip{
+  font-size:.78rem;padding:5px 11px;border:1px solid var(--line);
+  border-radius:999px;color:var(--ink-2);background:var(--surface)
+}
+
+section{margin:0 0 60px}
+h2{
+  font-family:Unbounded,"Golos Text",sans-serif;font-weight:500;
+  font-size:1.28rem;letter-spacing:-.01em;margin:0 0 8px;text-wrap:balance
+}
+.lede{color:var(--ink-2);margin:0 0 24px;max-width:62ch}
+p{margin:0 0 16px}
+strong{font-weight:600}
+
+/* key facts */
+.facts{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));margin:0}
+.fact{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+.fact b{
+  display:block;font-family:Unbounded,sans-serif;font-weight:500;
+  font-size:1.5rem;letter-spacing:-.02em;color:var(--accent-ink);margin-bottom:4px
+}
+.fact span{font-size:.94rem;color:var(--ink-2);line-height:1.5}
+
+/* figure */
+figure{margin:0}
+.scroller{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px}
+.flow{display:block;min-width:760px;max-width:100%;height:auto;color:var(--ink)}
+.flow rect{fill:var(--surface);stroke:var(--line);stroke-width:1.4}
+.flow .human rect{stroke:var(--accent);stroke-width:1.8;fill:var(--accent-soft)}
+.flow .stop rect{stroke-dasharray:5 4}
+.flow text{font-family:"Golos Text",sans-serif;font-size:13px;fill:var(--ink)}
+.flow .sub{font-size:11.5px;fill:var(--ink-2)}
+.flow .lane{font-size:11.5px;fill:var(--ink-2);letter-spacing:.1em;text-transform:uppercase}
+.flow .edge{stroke:var(--ink-2);stroke-width:1.4;fill:none}
+.flow .edge-accent{stroke:var(--accent);stroke-width:1.6;fill:none}
+.flow .tag{font-size:11.5px;fill:var(--accent-ink);font-weight:600}
+.flow .lanebg{fill:var(--surface-2);stroke:none}
+figcaption{font-size:.92rem;color:var(--ink-2);margin-top:14px;max-width:66ch}
+
+/* rules */
+.rules{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.rule{border:1px solid var(--line);border-radius:14px;padding:18px 20px;background:var(--surface)}
+.rule h3{font-size:1rem;font-weight:600;margin:0 0 6px}
+.rule p{margin:0;font-size:.95rem;color:var(--ink-2);line-height:1.55}
+
+/* steps */
+ol.steps{list-style:none;counter-reset:s;padding:0;margin:0;display:grid;gap:2px}
+ol.steps li{
+  counter-increment:s;display:grid;grid-template-columns:34px 1fr;gap:16px;
+  padding:14px 0;border-bottom:1px solid var(--line);align-items:start
+}
+ol.steps li::before{
+  content:counter(s);font-family:Unbounded,sans-serif;font-size:.85rem;font-weight:500;
+  color:var(--accent-ink);padding-top:2px
+}
+ol.steps li:last-child{border-bottom:0}
+ol.steps p{margin:0;font-size:.97rem}
+ol.steps span{display:block;color:var(--ink-2);font-size:.9rem;margin-top:2px}
+
+/* table */
+table{width:100%;border-collapse:collapse;font-size:.95rem}
+th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600}
+td:first-child{font-weight:500;width:42%}
+tbody tr:last-child td{border-bottom:0}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.num{font-variant-numeric:tabular-nums}
+
+/* chat cards */
+.cards{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(290px,1fr))}
+.card{border:1px solid var(--line);border-radius:14px;background:var(--surface);overflow:hidden}
+.card .cap{
+  padding:11px 16px;border-bottom:1px solid var(--line);background:var(--surface-2);
+  font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);font-weight:600
+}
+.card pre{
+  margin:0;padding:16px;font-family:"JetBrains Mono",ui-monospace,monospace;
+  font-size:.82rem;line-height:1.65;white-space:pre-wrap;color:var(--ink)
+}
+
+/* open items */
+ul.open{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+ul.open li{
+  display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:baseline;
+  padding:14px 18px;border:1px solid var(--line);border-left:3px solid var(--accent);
+  border-radius:12px;background:var(--surface);font-size:.97rem
+}
+ul.open li::before{content:"—";color:var(--accent-ink)}
+ul.open span{display:block;color:var(--ink-2);font-size:.9rem}
+
+footer{border-top:1px solid var(--line);padding-top:22px;color:var(--ink-2);font-size:.88rem}
+a{color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+@media (max-width:640px){body{font-size:16px}.head{padding-top:44px}}
+</style>
+
+<div class="wrap">
+
+<header class="head">
+  <p class="eyebrow">Студия «Мэри КО-КО» · Авито</p>
+  <h1>Маршрут HR-агента</h1>
+  <p class="stand">Как агент ведёт кандидата от отклика до записи на собеседование — и в каких трёх точках маршрут упирается в человека.</p>
+  <div class="meta">
+    <span class="chip">Регламент v4</span>
+    <span class="chip">25 августа 2026</span>
+    <span class="chip">Мастера · Администраторы · Модели · Обучение</span>
+  </div>
+</header>
+
+<section class="col">
+  <h2>Что агент делает и чего не делает</h2>
+  <p class="lede">Он быстрый исполнитель, а не тот, кто решает. Три вещи, которые стоит держать в голове, глядя на схему.</p>
+  <div class="facts">
+    <div class="fact"><b>5 минут</b><span>максимум на ответ кандидату — круглосуточно, включая выходные</span></div>
+    <div class="fact"><b>0 решений</b><span>ни одного отказа и ни одного приглашения без «да» или «нет» от руководителя</span></div>
+    <div class="fact"><b>0 придуманных окон</b><span>время называется только то, которое дали админы в чате</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>Маршрут кандидата</h2>
+  <p class="lede">Одинаково для мастеров и администраторов. Красным выделены шаги, где ход маршрута зависит от человека, — там же указано, сколько агент ждёт, прежде чем напомнить.</p>
+  <figure>
+    <div class="scroller">
+      <svg class="flow" viewBox="0 0 900 1010" role="img" aria-label="Схема маршрута: кандидат откликается, агент собирает анкету и передаёт руководителю; после «да» агент запрашивает окна у админов, предлагает их кандидату и передаёт админам результат — записать или связаться и подобрать другое время.">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+
+        <rect class="lanebg" x="20" y="52" width="260" height="944" rx="14"/>
+        <rect class="lanebg" x="320" y="52" width="260" height="944" rx="14"/>
+        <rect class="lanebg" x="620" y="52" width="260" height="944" rx="14"/>
+
+        <text class="lane" x="150" y="38" text-anchor="middle">Кандидат</text>
+        <text class="lane" x="450" y="38" text-anchor="middle">Агент</text>
+        <text class="lane" x="750" y="38" text-anchor="middle">Люди студии</text>
+
+        <g>
+          <rect x="30" y="70" width="240" height="44" rx="10"/>
+          <text x="150" y="97" text-anchor="middle">Откликнулся на объявление</text>
+        </g>
+        <path class="edge" d="M 150 114 L 400 150" marker-end="url(#ah)"/>
+
+        <g>
+          <rect x="330" y="150" width="240" height="56" rx="10"/>
+          <text x="450" y="174" text-anchor="middle">Приветствие и анкета</text>
+          <text class="sub" x="450" y="192" text-anchor="middle">7 пунктов, включая обучение</text>
+        </g>
+        <path class="edge" d="M 450 206 L 200 230" marker-end="url(#ah)"/>
+
+        <g>
+          <rect x="30" y="230" width="240" height="44" rx="10"/>
+          <text x="150" y="257" text-anchor="middle">Ответы и 2–3 фото работ</text>
+        </g>
+        <path class="edge" d="M 150 274 L 400 310" marker-end="url(#ah)"/>
+
+        <g>
+          <rect x="330" y="310" width="240" height="56" rx="10"/>
+          <text x="450" y="334" text-anchor="middle">Формальная проверка</text>
+          <text class="sub" x="450" y="352" text-anchor="middle">качество работ агент не оценивает</text>
+        </g>
+        <path class="edge" d="M 450 366 L 700 406" marker-end="url(#ah)"/>
+
+        <g class="human">
+          <rect x="630" y="406" width="240" height="56" rx="10"/>
+          <text x="750" y="430" text-anchor="middle">Руководитель: зовём?</text>
+          <text class="sub" x="750" y="448" text-anchor="middle">ждём до 4 часов</text>
+        </g>
+
+        <path class="edge-accent" d="M 630 434 L 285 486" marker-end="url(#ah)"/>
+        <text class="tag" x="600" y="428" text-anchor="end">нет</text>
+        <g class="stop">
+          <rect x="30" y="466" width="240" height="44" rx="10"/>
+          <text x="150" y="493" text-anchor="middle">Отказ без причины</text>
+        </g>
+
+        <path class="edge-accent" d="M 740 462 L 470 546" marker-end="url(#ah)"/>
+        <text class="tag" x="655" y="512">да</text>
+
+        <g>
+          <rect x="330" y="546" width="240" height="56" rx="10"/>
+          <text x="450" y="570" text-anchor="middle">Запрос окон у админов</text>
+          <text class="sub" x="450" y="588" text-anchor="middle">кандидату — «уточняю время»</text>
+        </g>
+        <path class="edge" d="M 570 574 L 700 626" marker-end="url(#ah)"/>
+
+        <g class="human">
+          <rect x="630" y="626" width="240" height="56" rx="10"/>
+          <text x="750" y="650" text-anchor="middle">Админы дают окна</text>
+          <text class="sub" x="750" y="668" text-anchor="middle">ждём до 2 часов</text>
+        </g>
+        <path class="edge" d="M 700 682 L 470 726" marker-end="url(#ah)"/>
+
+        <g>
+          <rect x="330" y="726" width="240" height="56" rx="10"/>
+          <text x="450" y="750" text-anchor="middle">Предлагает эти окна</text>
+          <text class="sub" x="450" y="768" text-anchor="middle">дословно, ничего не добавляя</text>
+        </g>
+        <path class="edge" d="M 400 782 L 200 826" marker-end="url(#ah)"/>
+
+        <g>
+          <rect x="30" y="826" width="240" height="44" rx="10"/>
+          <text x="150" y="853" text-anchor="middle">Выбирает время</text>
+        </g>
+
+        <path class="edge-accent" d="M 270 840 L 620 894" marker-end="url(#ah)"/>
+        <text class="tag" x="330" y="830">подходит</text>
+        <g>
+          <rect x="630" y="866" width="240" height="56" rx="10"/>
+          <text x="750" y="890" text-anchor="middle">«Нужно записать»</text>
+          <text class="sub" x="750" y="908" text-anchor="middle">имя, телефон, дата, время</text>
+        </g>
+
+        <path class="edge-accent" d="M 270 862 L 620 962" marker-end="url(#ah)"/>
+        <text class="tag" x="330" y="902">не подходит</text>
+        <g>
+          <rect x="630" y="934" width="240" height="56" rx="10"/>
+          <text x="750" y="958" text-anchor="middle">«Свяжитесь с кандидатом»</text>
+          <text class="sub" x="750" y="976" text-anchor="middle">контакт + предложенное время</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Агент ведёт всю переписку, но маршрут трижды упирается в человека: решение по кандидату, выдача окон и сама запись. Пунктирная рамка — конец маршрута.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>Правила, зашитые в маршрут</h2>
+  <p class="lede">Шесть запретов, из-за которых схема выглядит именно так.</p>
+  <div class="rules">
+    <div class="rule"><h3>Агент не отказывает сам</h3><p>Отказ уходит кандидату только после «нет» от руководителя — даже если у мастера нет обучения. Тогда в карточке просто стоит пометка «обучение не подтверждено».</p></div>
+    <div class="rule"><h3>Возраст не звучит</h3><p>19–35 — ориентир для вашего решения, а не причина в переписке. Отказ всегда один и тот же нейтральный текст.</p></div>
+    <div class="rule"><h3>Время — только от админов</h3><p>Своего расписания у агента нет. Он не знает, что занято, и поэтому никогда не называет время по своей инициативе.</p></div>
+    <div class="rule"><h3>Деньги — только цитатой</h3><p>Из объявления или из готовых ответов. Никаких «примерно выходит» и «обычно получается». Подробности — на собеседовании.</p></div>
+    <div class="rule"><h3>Кандидат не остаётся в тишине</h3><p>Пока ждём руководителя или админов, кандидату уходит сообщение со сроком. Молчание в переписке — потерянный человек.</p></div>
+    <div class="rule"><h3>Один человек — одна карточка</h3><p>Отклик на три объявления с одного номера не создаёт трёх кандидатов. Проверка идёт по телефону.</p></div>
+  </div>
+</section>
+
+<section class="col">
+  <h2>Модели на отработку</h2>
+  <p class="lede">Маршрут короче, но с двумя особенностями: агент честно называет, кто выполняет услугу, и после каждой записи спрашивает про судьбу объявления.</p>
+  <ol class="steps">
+    <li><p>Отвечает и сразу говорит главное<span>услугу выполняет ученик под наставником, длительность, платно или нет</span></p></li>
+    <li><p>Просит фото «до»<span>при дневном свете, 1–2 штуки</span></p></li>
+    <li><p>Сверяет фото с требованиями объявления<span>сомневается — отправляет фото админам на «да/нет», сам не решает</span></p></li>
+    <li><p>Запрашивает окна у админов<span>и только потом называет время модели</span></p></li>
+    <li><p>Передаёт результат в чат<span>«нужно записать» либо «время не подошло, свяжитесь»</span></p></li>
+    <li><p>Спрашивает про объявление<span>«ещё актуально или все модели найдены и скрываем?»</span></p></li>
+  </ol>
+</section>
+
+<section>
+  <h2>Почему агент не поднимает ложную тревогу</h2>
+  <p class="lede">Раньше «скрытое объявление» означало сразу две противоположные вещи: аварию и наше собственное действие. Теперь ответ админов доезжает до утренней проверки.</p>
+  <figure>
+    <div class="scroller">
+      <svg class="flow" viewBox="0 0 900 250" role="img" aria-label="Цепочка: модель записана, агент спрашивает админов об актуальности объявления, ответ «скрываем» ставит в журнале признак планового скрытия, и утренняя проверка по этому объявлению молчит.">
+        <defs>
+          <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g><rect x="20" y="40" width="180" height="56" rx="10"/>
+          <text x="110" y="64" text-anchor="middle">Модель записана</text>
+          <text class="sub" x="110" y="82" text-anchor="middle">окон осталось меньше</text></g>
+        <path class="edge" d="M 200 68 L 232 68" marker-end="url(#ah2)"/>
+
+        <g class="human"><rect x="240" y="40" width="180" height="56" rx="10"/>
+          <text x="330" y="64" text-anchor="middle">Вопрос админам</text>
+          <text class="sub" x="330" y="82" text-anchor="middle">«ещё актуально?»</text></g>
+        <path class="edge-accent" d="M 420 68 L 452 68" marker-end="url(#ah2)"/>
+        <text class="tag" x="436" y="34" text-anchor="middle">скрываем</text>
+
+        <g><rect x="460" y="40" width="180" height="56" rx="10"/>
+          <text x="550" y="64" text-anchor="middle">Отметка в журнале</text>
+          <text class="sub" x="550" y="82" text-anchor="middle">плановое скрытие = да</text></g>
+        <path class="edge" d="M 640 68 L 672 68" marker-end="url(#ah2)"/>
+
+        <g><rect x="680" y="40" width="200" height="56" rx="10"/>
+          <text x="780" y="64" text-anchor="middle">Проверка 09:30</text>
+          <text class="sub" x="780" y="82" text-anchor="middle">видит признак — молчит</text></g>
+
+        <path class="edge" stroke-dasharray="6 5" d="M 780 96 L 780 150 L 110 150 L 110 104" marker-end="url(#ah2)"/>
+        <text class="sub" x="445" y="168" text-anchor="middle">каждое утро, пока объявление не вернут в работу</text>
+
+        <g><rect x="240" y="186" width="400" height="46" rx="10"/>
+          <text x="440" y="214" text-anchor="middle">Если признака нет — агент выясняет причину и пишет руководителю</text></g>
+      </svg>
+    </div>
+    <figcaption>Один и тот же признак закрывает обе стороны конфликта: наше скрытие проходит молча, чужое — становится сообщением с реальной причиной.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>Объявления и баланс</h2>
+  <p class="lede">Четыре причины, по которым объявление пропадает, требуют четырёх разных действий. Плюс проверка баланса заранее — пока объявления ещё работают.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Что видит агент</th><th>Что делает</th></tr></thead>
+      <tbody>
+        <tr><td>Аванс ниже <span class="num">500 ₽</span></td><td>Пишет руководителю с текущей суммой, повторяет раз в сутки, пока не пополнят</td></tr>
+        <tr><td>Аванс <span class="num">0 ₽</span></td><td>Срочное сообщение: размещение вот-вот остановится</td></tr>
+        <tr><td>Скрыто, признак «плановое скрытие»</td><td>Ничего. Это наше собственное действие</td></tr>
+        <tr><td>Скрыто из-за средств</td><td>Руководителю: пополнить баланс</td></tr>
+        <tr><td>Снято модерацией</td><td>Руководителю: причина дословно, нужна правка текста — деньги не помогут</td></tr>
+        <tr><td>Истёк срок размещения</td><td>Руководителю: продлить</td></tr>
+        <tr><td>Причина неизвестна</td><td>Руководителю: сырой статус из кабинета, без догадок</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>Сроки</h2>
+  <p class="lede">По ним же агент понимает, когда напомнить и кого дёрнуть.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Кто</th><th>Сколько ждём</th></tr></thead>
+      <tbody>
+        <tr><td>Агент отвечает кандидату</td><td class="num">5 минут, круглосуточно</td></tr>
+        <tr><td>Руководитель — решение по кандидату</td><td class="num">4 часа, дальше напоминание</td></tr>
+        <tr><td>Админы — окна и запись</td><td class="num">2 часа, через 4 — эскалация руководителю</td></tr>
+        <tr><td>Кандидат молчит</td><td class="num">напоминания через 4 и 24 часа, закрытие через 72</td></tr>
+        <tr><td>Напоминание о встрече</td><td class="num">за сутки и за 2 часа</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>Что приходит в чат «админы коко»</h2>
+  <p class="lede">Формат один и тот же, поэтому сообщения находятся поиском и не теряются в ленте.</p>
+  <div class="cards">
+    <div class="card">
+      <div class="cap">Кандидату подошло время</div>
+      <pre>✅ НУЖНО ЗАПИСАТЬ НА СОБЕСЕДОВАНИЕ
+Имя:     Мария
+Телефон: +79001234567
+Когда:   Ср 27.08, 10:00
+Тип:     мастер (парикмахер)</pre>
+    </div>
+    <div class="card">
+      <div class="cap">Кандидату не подошло время</div>
+      <pre>⚠️ ВРЕМЯ НЕ ПОДОШЛО КАНДИДАТУ
+Имя:      Мария
+Телефон:  +79001234567
+Предлагали: Ср 27.08 10:00 / Пт 29.08 11:30
+—
+Свяжитесь, пожалуйста, и подберите
+удобное время.</pre>
+    </div>
+  </div>
+</section>
+
+<section class="col">
+  <h2>Осталось решить</h2>
+  <p class="lede">Тексты и маршрут готовы. Дальше — доступы и одно имя.</p>
+  <ul class="open">
+    <li><div>Имя, которым подписывается агент<span>«Здравствуйте! Это студия „Мэри КО-КО“, меня зовут ___ — я помощник руководителя»</span></div></li>
+    <li><div>ID чата «админы коко» и личного чата руководителя<span>чтобы карточки уходили туда, где их ждут</span></div></li>
+    <li><div>Ключи Avito API<span>client_id и client_secret из кабинета</span></div></li>
+    <li><div>Права на скрытие объявлений<span>агент скрывает сам или ставит задачу человеку</span></div></li>
+    <li><div>Срок ответа администратора на заявку об обучении<span>для остальных шагов стоят 2 часа</span></div></li>
+  </ul>
+</section>
+
+<footer>
+  Регламент, тексты сообщений и разбор конфликтов — в репозитории проекта, ветка <code>claude/avito-response-agent-hermes</code>.
+</footer>
+
+</div>
