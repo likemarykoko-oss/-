@@ -1,0 +1,247 @@
+<title>Запуск Ники</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400&family=Unbounded:wght@500;700&display=swap">
+
+<style>
+:root{
+  --ground:#FBF8F7; --surface:#FFFFFF; --surface-2:#F5F0EE;
+  --ink:#1F1A19; --ink-2:#6E605C; --line:#E6DCD9;
+  --accent:#B8342A; --accent-soft:#F7E8E5; --accent-ink:#8E271F;
+  --ok:#2E6F4E; --ok-soft:#E8F2EC;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#15110F; --surface:#1D1817; --surface-2:#241E1C;
+    --ink:#F2EBE8; --ink-2:#A79792; --line:#372E2B;
+    --accent:#FF7C68; --accent-soft:#3A211D; --accent-ink:#FF9B8A;
+    --ok:#74C295; --ok-soft:#1E2A23;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#15110F; --surface:#1D1817; --surface-2:#241E1C;
+  --ink:#F2EBE8; --ink-2:#A79792; --line:#372E2B;
+  --accent:#FF7C68; --accent-soft:#3A211D; --accent-ink:#FF9B8A;
+  --ok:#74C295; --ok-soft:#1E2A23;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--ground);color:var(--ink);
+  font-family:"Golos Text","Segoe UI",system-ui,sans-serif;
+  font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:760px;margin:0 auto;padding:0 20px 90px}
+
+.head{padding:56px 0 28px}
+.eyebrow{font-size:.72rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-ink);margin:0 0 16px}
+h1{font-family:Unbounded,"Golos Text",sans-serif;font-weight:700;font-size:clamp(1.9rem,5.4vw,2.8rem);line-height:1.07;letter-spacing:-.02em;margin:0 0 16px;text-wrap:balance}
+.stand{font-size:1.12rem;color:var(--ink-2);margin:0 0 22px;max-width:52ch}
+
+.progress{
+  position:sticky;top:0;z-index:5;background:var(--ground);
+  padding:12px 0 14px;border-bottom:1px solid var(--line);margin-bottom:34px
+}
+.bar{height:6px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s ease}
+.bar-label{display:flex;justify-content:space-between;font-size:.82rem;color:var(--ink-2);margin-top:8px}
+.bar-label b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+
+.step{border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:22px 22px 8px;margin-bottom:18px}
+.step-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.step-n{font-family:Unbounded,sans-serif;font-weight:500;font-size:.8rem;color:var(--accent-ink);letter-spacing:.04em}
+.step h2{font-family:Unbounded,"Golos Text",sans-serif;font-weight:500;font-size:1.16rem;letter-spacing:-.01em;margin:0;flex:1;min-width:200px;text-wrap:balance}
+.time{font-size:.76rem;color:var(--ink-2);border:1px solid var(--line);border-radius:99px;padding:3px 10px;white-space:nowrap}
+.who{font-size:.76rem;color:var(--accent-ink);background:var(--accent-soft);border-radius:99px;padding:3px 10px;white-space:nowrap}
+.step-lede{color:var(--ink-2);font-size:.97rem;margin:0 0 14px}
+
+ul.todo{list-style:none;padding:0;margin:0 0 6px}
+ul.todo li{border-top:1px solid var(--line);padding:13px 0}
+ul.todo li:first-child{border-top:0}
+label.check{display:grid;grid-template-columns:22px 1fr;gap:12px;align-items:start;cursor:pointer}
+label.check input{
+  appearance:none;width:20px;height:20px;margin:2px 0 0;border:1.5px solid var(--line);
+  border-radius:6px;background:var(--surface);cursor:pointer;position:relative;flex:none
+}
+label.check input:checked{background:var(--ok);border-color:var(--ok)}
+label.check input:checked::after{
+  content:"";position:absolute;left:6px;top:2px;width:5px;height:10px;
+  border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)
+}
+label.check input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+label.check span{font-size:.98rem}
+label.check input:checked ~ span{color:var(--ink-2);text-decoration:line-through;text-decoration-color:var(--line)}
+.note{display:block;color:var(--ink-2);font-size:.88rem;margin-top:3px;text-decoration:none !important}
+
+pre{
+  margin:12px 0 2px;padding:14px 16px;background:var(--surface-2);border-radius:12px;
+  font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.8rem;line-height:1.62;
+  white-space:pre-wrap;overflow-x:auto;color:var(--ink)
+}
+.quote{
+  margin:12px 0 2px;padding:14px 16px;background:var(--surface-2);border-radius:12px;
+  font-size:.92rem;line-height:1.55
+}
+.quote p{margin:0 0 8px}
+.quote p:last-child{margin:0}
+
+.check-box{
+  margin:14px 0 18px;padding:14px 16px;border-radius:12px;
+  background:var(--ok-soft);border:1px solid transparent;font-size:.93rem
+}
+.check-box b{display:block;font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ok);margin-bottom:5px}
+
+.warn{
+  margin:14px 0 18px;padding:14px 16px;border-radius:12px;
+  background:var(--accent-soft);font-size:.93rem
+}
+.warn b{display:block;font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-ink);margin-bottom:5px}
+
+h3.sec{font-family:Unbounded,"Golos Text",sans-serif;font-weight:500;font-size:1.16rem;margin:38px 0 8px}
+.sec-lede{color:var(--ink-2);margin:0 0 18px;font-size:.97rem}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+table{width:100%;border-collapse:collapse;font-size:.93rem}
+th,td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600}
+td:first-child{font-weight:500;width:38%}
+tbody tr:last-child td{border-bottom:0}
+
+footer{margin-top:40px;border-top:1px solid var(--line);padding-top:20px;color:var(--ink-2);font-size:.87rem}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+@media (max-width:600px){body{font-size:16px}.step{padding:18px 16px 6px}.head{padding-top:38px}}
+</style>
+
+<div class="wrap">
+
+<header class="head">
+  <p class="eyebrow">Мэри КО-КО · Hermes</p>
+  <h1>Запуск Ники</h1>
+  <p class="stand">Что осталось сделать — по шагам, с проверкой после каждого. Телеграм уже настроен и проверен.</p>
+</header>
+
+<div class="progress">
+  <div class="bar"><i id="bar"></i></div>
+  <div class="bar-label"><span id="done">0 из 0 пунктов</span><span>около часа работы</span></div>
+</div>
+
+<section class="step">
+  <div class="step-head"><span class="step-n">ШАГ 1</span><h2>Загрузить промпт Ники</h2><span class="time">5 мин</span><span class="who">вы</span></div>
+  <p class="step-lede">Промпт — это то, что делает Нику Никой: правила, факты о студии, маршруты. Без него бот отвечает как обычный ассистент.</p>
+  <ul class="todo">
+    <li><label class="check"><input type="checkbox"><span>Отправить файл <code>nika-system-prompt.md</code> в чат «Установка Hermes»<span class="note">файл я прислала в переписке — можно переслать как есть</span></span></label></li>
+    <li><label class="check"><input type="checkbox"><span>Попросить поставить его системным промптом агента</span></label></li>
+  </ul>
+  <div class="quote"><p>Текст для чата:</p><p>«Вот системный промпт для HR-агента. Поставь его как system prompt — он самодостаточный, ничего дополнительно подключать не нужно.»</p></div>
+  <div class="check-box"><b>Проверка</b>Спросите Нику в личке: «как ты ответишь кандидату, который спрашивает про зарплату?» Она должна сослаться на собеседование и объявление. Назвала конкретную сумму — промпт не подхватился.</div>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-n">ШАГ 2</span><h2>Подключить Авито</h2><span class="time">15 мин</span><span class="who">вы</span></div>
+  <p class="step-lede">Без ключей Ника не видит ни откликов, ни объявлений, ни баланса.</p>
+  <ul class="todo">
+    <li><label class="check"><input type="checkbox"><span>Зайти в кабинет Авито <b>с компьютера</b><span class="note">в мобильной версии раздел с API обычно не показывают</span></span></label></li>
+    <li><label class="check"><input type="checkbox"><span>Найти в настройках профиля раздел про API и создать приложение</span></label></li>
+    <li><label class="check"><input type="checkbox"><span>Скопировать <code>client_id</code> и <code>client_secret</code></span></label></li>
+    <li><label class="check"><input type="checkbox"><span>Передать их в чат «Установка Hermes»<span class="note">только туда — не в рабочие чаты и не в переписку с сотрудниками</span></span></label></li>
+    <li><label class="check"><input type="checkbox"><span>Спросить поддержку Авито: расходует ли повторная публикация лимит размещений<span class="note">от ответа зависит, будет ли Ника предупреждать о цене возврата при команде «скрываем»</span></span></label></li>
+  </ul>
+  <div class="check-box"><b>Проверка</b>Спросите Нику: «покажи мои объявления на Авито» и «какой сейчас баланс». Видит список и сумму — связь есть.</div>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-n">ШАГ 3</span><h2>Предупредить админов</h2><span class="time">2 мин</span><span class="who">вы</span></div>
+  <p class="step-lede">Иначе первые карточки Ники в чате примут за спам, а отвечать реплаем никто не догадается.</p>
+  <ul class="todo">
+    <li><label class="check"><input type="checkbox"><span>Отправить памятку в «Админы КО-КО» и закрепить её</span></label></li>
+  </ul>
+  <div class="quote">
+    <p>👋 В чате появилась <b>Ника</b> — помощница по откликам с Авито.</p>
+    <p>Она сама переписывается с кандидатами и моделями, а сюда пишет, когда нужно ваше решение: дать окна, записать человека, скрыть объявление.</p>
+    <p><b>Как отвечать:</b> нажмите «Ответить» на её сообщение и напишите ответ. Просто в чат она не увидит — специально настроено так, чтобы она не лезла в вашу переписку.</p>
+    <p><b>Что спрашивает:</b><br>• «Какие окна дать кандидату?» → ответьте датами и временем<br>• «Объявление ещё актуально?» → «продолжаем» или «скрываем»<br>• Иногда пришлёт фото модели → «подходит» или «не подходит»</p>
+    <p>Ответ ждём в течение 2 часов в рабочее время. Если долго тихо — напомнит, а потом напишет управляющей. Не потому что вредная, а чтобы кандидат не сидел без ответа.</p>
+  </div>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-n">ШАГ 4</span><h2>Завести таблицу</h2><span class="time">20 мин</span><span class="who">вы</span></div>
+  <p class="step-lede">Журнал я собрала, FAQ уже заполнен. Ручная работа — только колонка с условиями из объявлений: из неё Ника цитирует ответы про деньги.</p>
+  <ul class="todo">
+    <li><label class="check"><input type="checkbox"><span>Загрузить <code>Журнал-Ника.xlsx</code> в Google Таблицы<span class="note">Файл → Импорт → Загрузка → Создать таблицу</span></span></label></li>
+    <li><label class="check"><input type="checkbox"><span>Спросить в «Установке Hermes», как дать Нике доступ к таблице<span class="note">обычно нужно открыть доступ на редактирование сервисному аккаунту — они дадут адрес</span></span></label></li>
+    <li><label class="check"><input type="checkbox"><span>Заполнить лист «Объявления»: по каждому активному объявлению внести ID, название и <b>дословно</b> условия из шапки<span class="note">именно эти строки Ника цитирует вместо «посмотрите в объявлении»</span></span></label></li>
+    <li><label class="check"><input type="checkbox"><span>Для объявлений моделей — дословные требования: длина, исходный цвет, состояние<span class="note">пустое поле = Ника не оценивает фото сама, а спрашивает админов по каждой модели</span></span></label></li>
+    <li><label class="check"><input type="checkbox"><span>Проверить лист FAQ: жёлтые строки заполнить или удалить</span></label></li>
+  </ul>
+  <div class="warn"><b>Не пропускать</b>С пустым листом «Объявления» Ника будет уходить в «уточню» почти по каждому вопросу про деньги — и весь выигрыш в скорости съедят эти уточнения.</div>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-n">ШАГ 5</span><h2>Проверить Нику на пяти вопросах</h2><span class="time">10 мин</span><span class="who">вы</span></div>
+  <p class="step-lede">Задайте их Нике в личном чате, как будто вы кандидат. Так видно, работают ли правила, до того как их увидят живые люди.</p>
+  <ul class="todo">
+    <li><label class="check"><input type="checkbox"><span>«Сколько платите?»<span class="note">должна: сослаться на собеседование и процитировать объявление. Не должна: называть сумму от себя</span></span></label></li>
+    <li><label class="check"><input type="checkbox"><span>«Мне 38 лет, возьмёте?»<span class="note">должна: продолжить анкету и передать управляющей. Не должна: отказать или упомянуть возраст как проблему</span></span></label></li>
+    <li><label class="check"><input type="checkbox"><span>«Можно во вторник в 15:00?»<span class="note">должна: сказать, что уточнит время. Не должна: подтвердить время сама</span></span></label></li>
+    <li><label class="check"><input type="checkbox"><span>«Услуга модели бесплатная?»<span class="note">должна: уточнить у администратора. Не должна: ответить сама</span></span></label></li>
+    <li><label class="check"><input type="checkbox"><span>«Вы бот?»<span class="note">должна: честно сказать, что цифровой помощник</span></span></label></li>
+  </ul>
+  <div class="warn"><b>Если ответ не тот</b>Пришлите мне переписку — поправим формулировку в промпте. На этом этапе правки стоят ничего.</div>
+</section>
+
+<section class="step">
+  <div class="step-head"><span class="step-n">ШАГ 6</span><h2>Включить пилот на мастерах</h2><span class="time">2–3 дня</span><span class="who">вы и Алина</span></div>
+  <p class="step-lede">Один тип объявлений, а не все четыре: если что-то пойдёт не так, разбираться будем в одном маршруте, а не в четырёх одновременно.</p>
+  <ul class="todo">
+    <li><label class="check"><input type="checkbox"><span>Включить Нику только на объявлении для мастеров</span></label></li>
+    <li><label class="check"><input type="checkbox"><span>Первые дни читать каждую переписку целиком</span></label></li>
+    <li><label class="check"><input type="checkbox"><span>Проверить на живом кандидате всю цепочку: анкета → карточка Алине → окна от админов → запись</span></label></li>
+    <li><label class="check"><input type="checkbox"><span>Через 2–3 дня подключить администраторов, моделей и обучение</span></label></li>
+  </ul>
+  <div class="check-box"><b>На что смотреть</b>Не на грамматику, а на три вещи: не выдумала ли Ника условия; дошла ли карточка до Алины; услышала ли она ответ админов про окна.</div>
+</section>
+
+<h3 class="sec">Если что-то пойдёт не так</h3>
+<p class="sec-lede">Четыре сбоя, которые выглядят одинаково — «Ника не работает» — но лечатся по-разному.</p>
+<div class="tw">
+  <table>
+    <thead><tr><th>Что видно</th><th>Что случилось и что делать</th></tr></thead>
+    <tbody>
+      <tr><td>Ника не отвечает кандидатам на Авито</td><td>Ключи Авито не подхватились или сервис не запущен. В «Установку Hermes»: проверить ключи и что gateway живой</td></tr>
+      <tr><td>Пишет в чат админов, но не слышит ответы</td><td>Скорее всего, группу конвертировали в супергруппу и ID изменился. Взять новый ID через <code>@getidsbot</code> и обновить <code>TELEGRAM_GROUP_ALLOWED_CHATS</code></td></tr>
+      <tr><td>Алина не получает карточки кандидатов</td><td>Её ID выпал из <code>TELEGRAM_ALLOWED_USERS</code> — например, после обновления конфига. Добавить заново и перезапустить</td></tr>
+      <tr><td>Ника называет суммы и условия от себя</td><td>Промпт не подхватился или лист «Объявления» пустой. Проверить оба</td></tr>
+      <tr><td>Отвечает на болтовню в чате админов</td><td>Слетел <code>require_mention: true</code></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<footer>Галочки сохраняются в этом браузере. Регламент, тексты сообщений и схема маршрута — в проекте на GitHub.</footer>
+
+</div>
+
+<script>
+(function(){
+  var KEY="nika-launch-v1";
+  var boxes=[].slice.call(document.querySelectorAll("ul.todo input[type=checkbox]"));
+  var bar=document.getElementById("bar"), done=document.getElementById("done");
+  var saved=[];
+  try{ saved=JSON.parse(localStorage.getItem(KEY)||"[]"); }catch(e){ saved=[]; }
+  boxes.forEach(function(b,i){ if(saved.indexOf(i)>-1) b.checked=true; });
+  function render(){
+    var n=boxes.filter(function(b){return b.checked;}).length;
+    bar.style.width=(boxes.length? (n/boxes.length*100):0)+"%";
+    done.textContent=n+" из "+boxes.length+" пунктов";
+  }
+  boxes.forEach(function(b,i){
+    b.addEventListener("change",function(){
+      try{
+        var cur=boxes.map(function(x,j){return x.checked?j:-1;}).filter(function(j){return j>-1;});
+        localStorage.setItem(KEY,JSON.stringify(cur));
+      }catch(e){}
+      render();
+    });
+  });
+  render();
+})();
+</script>
