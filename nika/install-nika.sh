@@ -131,7 +131,7 @@ mask() {  # безопасный показ секрета
 mem_avail_mb() { awk '/MemAvailable/ {printf "%d", $2/1024}' /proc/meminfo; }
 disk_avail_mb() { df -Pm "$1" 2>/dev/null | awk 'NR==2 {print $4}'; }
 
-port_busy() { ss -ltn 2>/dev/null | awk '{print $4}' | grep -qE "[:.]$1\$"; }
+port_busy() { local _pb; _pb="$(ss -ltn 2>/dev/null | awk '{print $4}' | grep -E "[:.]$1\$" || true)"; [ -n "$_pb" ]; }
 
 # =============================================================================
 #  UNINSTALL
@@ -173,7 +173,7 @@ info "Свободно на /opt: ${DISK_AVAIL}M"
 PROD_PRESENT=1
 [ -d "$PROD_DIR" ]  || { warn "Не найден каталог боевой инсталляции: $PROD_DIR"; PROD_PRESENT=0; }
 [ -r "$PROD_HOME/.env" ] || { warn "Не найден $PROD_HOME/.env — ключи скопировать не выйдет"; PROD_PRESENT=0; }
-if systemctl list-unit-files 2>/dev/null | grep -q "^${PROD_SERVICE}.service"; then
+if [ -n "$(systemctl list-unit-files 2>/dev/null | grep "^${PROD_SERVICE}\.service" || true)" ]; then
   ok "Боевой сервис $PROD_SERVICE: $(systemctl is-active "$PROD_SERVICE" 2>/dev/null || echo inactive)"
 else
   warn "Сервис $PROD_SERVICE не зарегистрирован в systemd"
@@ -225,7 +225,7 @@ if [ ! -f "$PROD_HOME/SOUL.md" ]; then
 else
   info "Первые строки:"
   head -5 "$PROD_HOME/SOUL.md" | sed 's/^/      | /'
-  if head -40 "$PROD_HOME/SOUL.md" | grep -qiE 'ника|студи|рекрут|кандидат|мэри'; then
+  if [ -n "$(head -40 "$PROD_HOME/SOUL.md" | grep -iE 'ника|студи|рекрут|кандидат|мэри' || true)" ]; then
     warn "Похоже, на боевом боте всё ещё промпт «Ника» — его должны были откатить."
     NEWEST_BAK="$(find "$PROD_HOME" -maxdepth 1 -name 'SOUL.md.bak-*' ! -name '*nika-recruiter*' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)"
     if [ -n "${NEWEST_BAK:-}" ]; then
@@ -337,9 +337,9 @@ HELP_TXT="$(bash "$INST_TMP" --help 2>&1 || true)"
 printf '%s\n' "$HELP_TXT" > "$BACKUP_DIR/installer-help.txt"
 
 ARGS=(--dir "$NIKA_DIR" --hermes-home "$NIKA_HOME")
-if printf '%s' "$HELP_TXT" | grep -q -- '--dir'; then
+if [ -n "$(printf '%s' "$HELP_TXT" | grep -- '--dir' || true)" ]; then
   # справка читается — берём только те флаги, которые установщик реально знает
-  supports() { printf '%s' "$HELP_TXT" | grep -qF -- "$1"; }
+  supports() { local _s; _s="$(printf '%s' "$HELP_TXT" | grep -F -- "$1" || true)"; [ -n "$_s" ]; }
   supports '--skip-browser'      && ARGS+=(--skip-browser)
   supports '--skip-browser'      || { supports '--no-playwright' && ARGS+=(--no-playwright); }
   supports '--skip-computer-use' && ARGS+=(--skip-computer-use)
@@ -411,7 +411,7 @@ while [ -z "$TG_TOKEN" ]; do
   printf '  Вставь токен от @BotFather (ввод скрыт, в лог не попадёт): '
   read -r -s TG_TOKEN </dev/tty; printf '\n'
   TG_TOKEN="${TG_TOKEN//[[:space:]]/}"
-  if ! printf '%s' "$TG_TOKEN" | grep -qE '^[0-9]{6,15}:[A-Za-z0-9_-]{30,}$'; then
+  if ! [[ "$TG_TOKEN" =~ ^[0-9]{6,15}:[A-Za-z0-9_-]{30,}$ ]]; then
     warn "Формат не похож на токен (цифры:строка). Попробуй ещё раз."
     TG_TOKEN=""
     continue
