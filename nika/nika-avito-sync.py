@@ -65,12 +65,46 @@ def get_json(url: str, token: str) -> dict:
 
 
 def money(value) -> str:
+    """Запасной вариант, когда точной строки из объявления нет.
+
+    ВНИМАНИЕ: /core/v1/items отдаёт одно число (например 72500), даже когда в
+    объявлении написана вилка «60 000 — 85 000 ₽». Называть кандидату это
+    число нельзя — его в объявлении нет. Поэтому основной источник цены —
+    price_string из мессенджера, а сюда попадают только объявления без чатов.
+    """
     if value in (None, "", 0):
-        return "цена не указана"
+        return "цена в объявлении не указана"
     try:
-        return "{:,}".format(int(value)).replace(",", " ") + " руб."
+        return "около " + "{:,}".format(int(value)).replace(",", " ") + " руб. (точную формулировку смотри в объявлении)"
     except (TypeError, ValueError):
         return str(value)
+
+
+def price_of(item: dict, exact: dict) -> str:
+    """Цена так, как её видит кандидат в объявлении."""
+    shown = exact.get(item.get("id"))
+    return shown if shown else money(item.get("price"))
+
+
+def fetch_price_strings(token: str, user_id: str) -> dict:
+    """item_id -> строка цены из объявления («60 000 — 85 000 ₽», «Цена договорная»).
+
+    Берётся из мессенджера: сам текст переписки тариф закрывает, но карточка
+    объявления в чате приходит целиком, и цена там в том же виде, что видит
+    человек. Покрывает объявления, по которым кто-то писал, — то есть ровно
+    те, про которые Нику и спрашивают.
+    """
+    out = {}
+    try:
+        data = get_json("%s/messenger/v2/accounts/%s/chats?limit=100" % (API, user_id), token)
+    except Exception as exc:
+        print("nika-avito-sync: цены из мессенджера недоступны: %s" % exc, file=sys.stderr)
+        return out
+    for chat in data.get("chats") or []:
+        value = ((chat.get("context") or {}).get("value")) or {}
+        if value.get("id") and value.get("price_string"):
+            out[value["id"]] = value["price_string"]
+    return out
 
 
 # В архиве лежит и мебель, и телевизор — кандидату это неинтересно, а место
@@ -99,7 +133,7 @@ def fetch_items(token: str, status: str) -> list:
     return items
 
 
-def render(active: list, archived: list) -> str:
+def render(active: list, archived: list, exact: dict) -> str:
     now = datetime.now(MSK).strftime("%d.%m.%Y %H:%M")
     out = [BEGIN, "", "## Объявления студии на Авито", "",
            "Выгружено из личного кабинета %s МСК, обновляется само." % now,
@@ -110,7 +144,7 @@ def render(active: list, archived: list) -> str:
         out.append("")
         for it in active:
             kind = (it.get("category") or {}).get("name") or "объявление"
-            out.append("- «%s» — %s, %s" % (it.get("title") or "без названия", kind, money(it.get("price"))))
+            out.append("- «%s» — %s, %s" % (it.get("title") or "без названия", kind, price_of(it, exact)))
             if it.get("address"):
                 out.append("  адрес: %s" % it["address"])
             if it.get("url"):
@@ -126,7 +160,7 @@ def render(active: list, archived: list) -> str:
                    "но по ним могут написать):")
         out.append("")
         for it in archived[:20]:
-            out.append("- «%s» — %s" % (it.get("title") or "без названия", money(it.get("price"))))
+            out.append("- «%s» — %s" % (it.get("title") or "без названия", price_of(it, exact)))
         if len(archived) > 20:
             out.append("- …и ещё %d" % (len(archived) - 20))
         out.append("")
@@ -182,7 +216,8 @@ def main() -> None:
     except OSError as exc:
         fail("не читается %s: %s" % (soul_path, exc))
 
-    updated = splice(soul, render(active, archived))
+    exact = fetch_price_strings(token, env.get("AVITO_USER_ID") or "")
+    updated = splice(soul, render(active, archived, exact))
     if updated == soul:
         print("nika-avito-sync: без изменений (%d активных, %d в архиве)" % (len(active), len(archived)))
         return

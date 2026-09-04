@@ -147,9 +147,10 @@ if [ "$UNINSTALL" = 1 ]; then
   systemctl disable --now "$NIKA_SERVICE" 2>/dev/null || true
   rm -f "/etc/systemd/system/${NIKA_SERVICE}.service"
   systemctl daemon-reload || true
-  systemctl disable --now nika-avito-sync.timer 2>/dev/null || true
+  systemctl disable --now nika-avito-sync.timer nika-avito-watch.timer 2>/dev/null || true
   rm -f /etc/systemd/system/nika-avito-sync.timer /etc/systemd/system/nika-avito-sync.service
-  rm -f /usr/local/bin/nika-avito-sync
+  rm -f /etc/systemd/system/nika-avito-watch.timer /etc/systemd/system/nika-avito-watch.service
+  rm -f /usr/local/bin/nika-avito-sync /usr/local/bin/nika-avito-watch
   systemctl daemon-reload || true
   rm -f /usr/local/bin/hermes-nika /usr/local/bin/hermes-nika-raw
   rm -rf "$NIKA_DIR" "$NIKA_HOME"
@@ -900,6 +901,54 @@ UNIT
   else
     rm -f "$SYNC_BIN.new"
     warn "Не скачался $NIKA_REPO_RAW/nika-avito-sync.py — объявления в контекст не попадут"
+  fi
+
+  # ------------------------- сторож: баланс, сроки, неотвеченные -------------
+  # Отправка идёт через `hermes send` — без модели, то есть бесплатно.
+  WATCH_BIN=/usr/local/bin/nika-avito-watch
+  set +e
+  curl -fsSL --max-time 30 "$NIKA_REPO_RAW/nika-avito-watch.py" -o "$WATCH_BIN.new"
+  WATCH_RC=$?
+  set -e
+  if [ "$WATCH_RC" = 0 ] && [ -s "$WATCH_BIN.new" ] && head -1 "$WATCH_BIN.new" | grep -q python; then
+    mv "$WATCH_BIN.new" "$WATCH_BIN"
+    chmod 755 "$WATCH_BIN"
+    ok "Сторож Авито: $WATCH_BIN"
+
+    cat > /etc/systemd/system/nika-avito-watch.service <<UNIT
+[Unit]
+Description=Ника — сторож Авито (баланс, сроки объявлений, неотвеченные)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=HERMES_HOME=$NIKA_HOME
+ExecStart=$WATCH_BIN
+Nice=10
+MemoryMax=128M
+UNIT
+
+    cat > /etc/systemd/system/nika-avito-watch.timer <<'UNIT'
+[Unit]
+Description=Проверять Авито каждые 15 минут
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=15min
+RandomizedDelaySec=2min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+
+    systemctl daemon-reload
+    systemctl enable --now nika-avito-watch.timer >/dev/null 2>&1 || warn "Таймер сторожа не включился"
+    info "Сторож проверяет Авито каждые 15 минут и пишет владелице в Telegram"
+  else
+    rm -f "$WATCH_BIN.new"
+    warn "Не скачался $NIKA_REPO_RAW/nika-avito-watch.py — оповещений по Авито не будет"
   fi
 fi
 
