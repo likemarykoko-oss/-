@@ -30,9 +30,9 @@ API = "https://api.avito.ru"
 TIMEOUT = 30
 MSK = timezone(timedelta(hours=3))
 
-BALANCE_FLOOR = int(os.environ.get("NIKA_BALANCE_FLOOR", "500"))      # рублей
+BALANCE_FLOOR = int(os.environ.get("NIKA_BALANCE_FLOOR", "200"))      # рублей
 EXPIRY_DAYS = int(os.environ.get("NIKA_EXPIRY_DAYS", "3"))            # дней до снятия
-REPLY_GRACE_MIN = int(os.environ.get("NIKA_REPLY_GRACE_MIN", "30"))   # минут на ответ
+MANAGER = os.environ.get("NIKA_MANAGER", "Управляющая")               # к кому обращаться в чате
 MAX_LIST = int(os.environ.get("NIKA_MAX_LIST", "8"))                 # строк в одном сообщении
 BALANCE_EVERY_MIN = int(os.environ.get("NIKA_BALANCE_EVERY_MIN", "60"))  # как часто трогать баланс
 SEND_BIN = os.environ.get("NIKA_SEND_BIN", "/usr/local/bin/hermes-nika")
@@ -161,13 +161,14 @@ def check_balance(token: str, user: str, state: dict, out: list) -> None:
     state["balance_value"] = rubles
 
     if is_low and not was_low:
-        out.append("Баланс Авито.Работы: %s, это ниже порога %s\n"
+        out.append("%s, баланс Авито.Работы упал до %s — это ниже порога %s\n"
                    "Когда он кончится, продвижение вакансий остановится и объявления "
                    "уйдут из показа.\n"
                    "Пополнить: https://www.avito.ru/profile/wallet"
-                   % (rub(rubles), rub(BALANCE_FLOOR)))
+                   % (MANAGER, rub(rubles), rub(BALANCE_FLOOR)))
     elif was_low and not is_low:
-        out.append("Баланс Авито.Работы пополнен, сейчас %s. Всё в порядке." % rub(rubles))
+        out.append("%s, баланс Авито.Работы пополнен, сейчас %s. Всё в порядке."
+                   % (MANAGER, rub(rubles)))
 
 
 def check_items(token: str, user: str, state: dict, out: list) -> None:
@@ -201,15 +202,16 @@ def check_items(token: str, user: str, state: dict, out: list) -> None:
         key = "expiry_%s_%s" % (iid, ends.date().isoformat())
         if 0 <= days <= EXPIRY_DAYS and not state.get(key):
             state[key] = True
-            out.append("Объявление «%s» снимется %s, осталось %d дн.\n"
+            out.append("%s, объявление «%s» снимется %s, осталось %d дн.\n"
                        "Если вакансия ещё нужна, продлите: %s"
-                       % (title, ends.strftime("%d.%m в %H:%M"), int(days),
+                       % (MANAGER, title, ends.strftime("%d.%m в %H:%M"), int(days),
                           item.get("url") or "личный кабинет Авито"))
 
     for iid, title in seen_before.items():
         if iid not in seen_now:
-            out.append("Объявление «%s» больше не активно: снято, закончилось или отклонено.\n"
-                       "Отклики по нему приходить перестанут." % title)
+            out.append("%s, объявление «%s» больше не активно: снято, закончилось "
+                       "или отклонено.\nОтклики по нему приходить перестанут."
+                       % (MANAGER, title))
     state["active_items"] = seen_now
 
 
@@ -223,7 +225,14 @@ def describe_author(chat: dict, author_id) -> str:
     return "кандидат"
 
 
-def check_chats(token: str, user: str, state: dict, out: list) -> None:
+def check_new_leads(token: str, user: str, state: dict, out: list) -> None:
+    """Только первичные отклики: чат, которого раньше не было.
+
+    Намеренно НЕ следим за тем, ответили ли на сообщение в уже известном чате.
+    Переписку ведут живые люди, текста её мы не видим, и напоминать «вам не
+    ответили» по каждому чужому диалогу — значит спамить. Повод написать один:
+    появился новый человек, которого ещё никто не видел.
+    """
     try:
         chats = (get_json("%s/messenger/v2/accounts/%s/chats?limit=100" % (API, user), token)
                  .get("chats") or [])
@@ -231,58 +240,75 @@ def check_chats(token: str, user: str, state: dict, out: list) -> None:
         print("nika-avito-watch: чаты недоступны: %s" % exc, file=sys.stderr)
         return
 
+    known = state.get("known_chats")
+    first_run = known is None
+    known = known or {}
     now = int(datetime.now(timezone.utc).timestamp())
-    notified = state.get("notified_messages") or {}
-    fresh = {}
-    pending = []
+    leads = []
 
     for chat in chats:
+        cid = chat.get("id")
+        if not cid:
+            continue
+        seen_before = cid in known
+        known[cid] = 1
+        if seen_before or first_run:
+            continue
+
         last = chat.get("last_message") or {}
         if last.get("direction") != "in":
-            continue                                # последним отвечали мы, всё в порядке
-        mid = last.get("id")
-        if not mid:
-            continue
-        age = now - int(last.get("created") or now)
-        if age < REPLY_GRACE_MIN * 60:
-            fresh[mid] = notified.get(mid, 0)       # ещё есть время ответить по-человечески
-            continue
-        fresh[mid] = 1
-        if notified.get(mid):
-            continue                                # про это сообщение уже говорили
+            continue                        # чат завели мы сами — это не отклик
 
         value = ((chat.get("context") or {}).get("value")) or {}
-        pending.append("- %s, по объявлению «%s» (%s), написал(а) %s\n  %s"
-                       % (describe_author(chat, last.get("author_id")),
-                          value.get("title") or "без названия",
-                          value.get("price_string") or "цена не указана",
-                          ago(age), value.get("url") or MESSENGER_URL))
+        leads.append("- %s, по объявлению «%s» (%s), %s\n  %s"
+                     % (describe_author(chat, last.get("author_id")),
+                        value.get("title") or "без названия",
+                        value.get("price_string") or "цена не указана",
+                        ago(now - int(last.get("created") or now)),
+                        value.get("url") or MESSENGER_URL))
 
-    first_run = "notified_messages" not in state
-    state["notified_messages"] = fresh
-    if not pending:
+    state["known_chats"] = known
+
+    if first_run:
+        print("nika-avito-watch: запомнил %d существующих чатов, "
+              "дальше сообщаю только про новые" % len(known))
+        return
+    if not leads:
         return
 
-    shown = pending[:MAX_LIST]
-    tail = len(pending) - len(shown)
-    if first_run:
-        # Первое включение: не заваливаем человека всем накопившимся хвостом.
-        # Даём цифру целиком и несколько самых свежих обращений.
-        head = ("Первое включение сторожа. В Авито накопилось обращений без ответа: %d.\n\n"
-                "Самые свежие:" % len(pending))
-    else:
-        head = "В Авито ждут ответа, %d:\n" % len(pending)
+    shown = leads[:MAX_LIST]
+    tail = len(leads) - len(shown)
+    head = ("%s, у нас новый отклик на Авито:" % MANAGER if len(leads) == 1
+            else "%s, у нас новые отклики на Авито — %d:" % (MANAGER, len(leads)))
     parts = [head, "\n".join(shown)]
     if tail > 0:
-        parts.append("…и ещё %d — все в личном кабинете." % tail)
-    parts.append("Открыть переписку: %s" % MESSENGER_URL)
+        parts.append("…и ещё %d." % tail)
+    parts.append("Не забудьте обработать: %s" % MESSENGER_URL)
     out.append("\n\n".join(parts))
 
 
-def resolve_target(env: dict) -> str:
-    target = os.environ.get("NIKA_ALERT_CHAT")
-    if target:
-        return target
+def resolve_target(home: str, env: dict) -> str:
+    """Куда писать: общий чат, если он уже известен, иначе владелице в личку.
+
+    Общий чат появляется сам, как только бота добавят в рабочую группу и там
+    кто-нибудь напишет: Hermes записывает известные каналы в channel_directory.
+    Поэтому специально ничего настраивать не нужно — переключится само.
+    """
+    explicit = os.environ.get("NIKA_ALERT_CHAT")
+    if explicit:
+        return explicit
+
+    try:
+        with open(os.path.join(home, "channel_directory.json"), encoding="utf-8") as fh:
+            directory = json.load(fh)
+        for entry in (directory.get("platforms") or {}).get("telegram") or []:
+            if (entry.get("type") or "").lower() in ("group", "supergroup") and entry.get("id"):
+                target = "telegram:" + str(entry["id"])
+                thread = entry.get("thread_id")
+                return target + ":" + str(thread) if thread else target
+    except (OSError, ValueError, AttributeError):
+        pass
+
     first = (env.get("TELEGRAM_ALLOWED_USERS") or "").split(",")[0].strip()
     if not first:
         print("nika-avito-watch: некому писать, задай NIKA_ALERT_CHAT", file=sys.stderr)
@@ -303,7 +329,7 @@ def main() -> None:
         print("nika-avito-watch: нет ключей AVITO_*, нечего сторожить", file=sys.stderr)
         raise SystemExit(1)
 
-    target = resolve_target(env)
+    target = resolve_target(home, env)
 
     try:
         token = post_form(API + "/token", {"grant_type": "client_credentials",
@@ -319,7 +345,7 @@ def main() -> None:
 
     check_balance(token, user, state, messages)
     check_items(token, user, state, messages)
-    check_chats(token, user, state, messages)
+    check_new_leads(token, user, state, messages)
 
     if os.environ.get("NIKA_WATCH_DRY_RUN"):
         print("--- сухой прогон, отправки не будет, состояние не пишется ---")
