@@ -42,6 +42,8 @@ PROD_SERVICE="${PROD_SERVICE:-hermes-gateway}"
 PROD_A2A_PORT="${PROD_A2A_PORT:-9900}"
 
 INSTALLER_URL="${INSTALLER_URL:-https://hermes-agent.nousresearch.com/install.sh}"
+# Наши собственные файлы (синхронизатор объявлений) лежат в этом же репозитории
+NIKA_REPO_RAW="${NIKA_REPO_RAW:-https://raw.githubusercontent.com/likemarykoko-oss/-/claude/telegram-avito-agent-hm8j1p/nika}"
 BACKUP_DIR="/root/.nika-install-backup"
 LOG_FILE="/root/nika-install.log"
 REPORT_FILE="/root/nika-report.txt"
@@ -144,6 +146,10 @@ if [ "$UNINSTALL" = 1 ]; then
   [ "$(ask_yn "Удалить $NIKA_SERVICE, $NIKA_DIR и все данные Ники?" n)" = "y" ] || die "Отменено."
   systemctl disable --now "$NIKA_SERVICE" 2>/dev/null || true
   rm -f "/etc/systemd/system/${NIKA_SERVICE}.service"
+  systemctl daemon-reload || true
+  systemctl disable --now nika-avito-sync.timer 2>/dev/null || true
+  rm -f /etc/systemd/system/nika-avito-sync.timer /etc/systemd/system/nika-avito-sync.service
+  rm -f /usr/local/bin/nika-avito-sync
   systemctl daemon-reload || true
   rm -f /usr/local/bin/hermes-nika /usr/local/bin/hermes-nika-raw
   rm -rf "$NIKA_DIR" "$NIKA_HOME"
@@ -266,12 +272,12 @@ OPENROUTER_KEY="$(get_env_val OPENROUTER_API_KEY "$PROD_HOME/.env" || true)"
 [ -n "$OPENROUTER_KEY" ] || die "OPENROUTER_API_KEY не найден в $PROD_HOME/.env — без него primary-провайдера не будет."
 ok "OPENROUTER_API_KEY найден: $(mask "$OPENROUTER_KEY")"
 
-# необязательные ключи fallback-цепочки
+# необязательные ключи: fallback-цепочка и доступ к Авито (нужен для контекста объявлений)
 declare -a OPTIONAL_KEYS=()
 while IFS= read -r k; do
   case "$k" in
     *CODEX*|*OPENAI*|*CHATGPT*) continue ;;   # категорически не переносим
-    *GONKA*|*NOUS*|*PORTAL*) OPTIONAL_KEYS+=("$k") ;;
+    *GONKA*|*NOUS*|*PORTAL*|AVITO_*) OPTIONAL_KEYS+=("$k") ;;
   esac
 done < <(grep -aoE '^[[:space:]]*(export[[:space:]]+)?[A-Z0-9_]+=' "$PROD_HOME/.env" 2>/dev/null \
           | sed -E 's/^[[:space:]]*(export[[:space:]]+)?//; s/=$//' | sort -u)
@@ -829,6 +835,72 @@ if [ -f "$NIKA_HOME/config.yaml" ]; then
   fi
 else
   warn "config.yaml не создан установщиком — сервис может создать его при первом старте"
+fi
+
+# --------------------------- объявления Авито --------------------------------
+# Без этого Ника не видит ни одного своего объявления, и любая её фраза про
+# зарплату — догадка. Полного текста объявлений API на текущем тарифе не даёт
+# (мессенджер закрыт кодом 402), но заголовок, цену и адрес — даёт.
+step "Объявления Авито в контекст Ники"
+
+AVITO_ID="$(get_env_val AVITO_CLIENT_ID "$NIKA_HOME/.env" || true)"
+if [ -z "$AVITO_ID" ]; then
+  info "Ключей AVITO_* нет — пропускаю выгрузку объявлений"
+else
+  SYNC_BIN=/usr/local/bin/nika-avito-sync
+  set +e
+  curl -fsSL --max-time 30 "$NIKA_REPO_RAW/nika-avito-sync.py" -o "$SYNC_BIN.new"
+  SYNC_RC=$?
+  set -e
+  if [ "$SYNC_RC" = 0 ] && [ -s "$SYNC_BIN.new" ] && head -1 "$SYNC_BIN.new" | grep -q python; then
+    mv "$SYNC_BIN.new" "$SYNC_BIN"
+    chmod 755 "$SYNC_BIN"
+    ok "Синхронизатор объявлений: $SYNC_BIN"
+
+    cat > /etc/systemd/system/nika-avito-sync.service <<UNIT
+[Unit]
+Description=Ника — выгрузка объявлений Авито в SOUL.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=HERMES_HOME=$NIKA_HOME
+ExecStart=$SYNC_BIN
+Nice=10
+MemoryMax=128M
+UNIT
+
+    cat > /etc/systemd/system/nika-avito-sync.timer <<'UNIT'
+[Unit]
+Description=Обновлять объявления Авито у Ники раз в 6 часов
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=6h
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+
+    systemctl daemon-reload
+    systemctl enable --now nika-avito-sync.timer >/dev/null 2>&1 || warn "Таймер выгрузки не включился"
+
+    set +e
+    SYNC_OUT="$(HERMES_HOME="$NIKA_HOME" "$SYNC_BIN" 2>&1)"
+    SYNC_RUN_RC=$?
+    set -e
+    if [ "$SYNC_RUN_RC" = 0 ]; then
+      ok "${SYNC_OUT:-объявления выгружены}"
+    else
+      warn "Выгрузка объявлений не удалась: $SYNC_OUT"
+    fi
+  else
+    rm -f "$SYNC_BIN.new"
+    warn "Не скачался $NIKA_REPO_RAW/nika-avito-sync.py — объявления в контекст не попадут"
+  fi
 fi
 
 # ------------------------------- модель --------------------------------------
