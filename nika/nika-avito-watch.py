@@ -34,6 +34,7 @@ BALANCE_FLOOR = int(os.environ.get("NIKA_BALANCE_FLOOR", "500"))      # рубл
 EXPIRY_DAYS = int(os.environ.get("NIKA_EXPIRY_DAYS", "3"))            # дней до снятия
 REPLY_GRACE_MIN = int(os.environ.get("NIKA_REPLY_GRACE_MIN", "30"))   # минут на ответ
 MAX_LIST = int(os.environ.get("NIKA_MAX_LIST", "8"))                 # строк в одном сообщении
+BALANCE_EVERY_MIN = int(os.environ.get("NIKA_BALANCE_EVERY_MIN", "60"))  # как часто трогать баланс
 SEND_BIN = os.environ.get("NIKA_SEND_BIN", "/usr/local/bin/hermes-nika")
 MESSENGER_URL = "https://www.avito.ru/profile/messenger"
 
@@ -65,6 +66,15 @@ def post_form(url: str, data: dict) -> dict:
 def get_json(url: str, token: str) -> dict:
     req = urllib.request.Request(url)
     req.add_header("Authorization", "Bearer " + token)
+    with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+        return json.loads(resp.read().decode())
+
+
+def post_json(url: str, token: str, payload: dict) -> dict:
+    req = urllib.request.Request(url, data=json.dumps(payload).encode(), method="POST")
+    req.add_header("Authorization", "Bearer " + token)
+    req.add_header("Content-Type", "application/json")
+    req.add_header("X-Source", "hermes-nika")
     with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
         return json.loads(resp.read().decode())
 
@@ -116,23 +126,48 @@ def send(target: str, subject: str, body: str) -> bool:
 
 
 def check_balance(token: str, user: str, state: dict, out: list) -> None:
+    """У Авито два разных баланса, и путать их нельзя.
+
+    /core/v1/accounts/{u}/balance/ — кошелёк для разовых платных услуг.
+    У студии он пустой, и это нормально: она за них так не платит. Ноль здесь
+    ни о чём не говорит и поводом для тревоги не является.
+
+    POST /cpa/v3/balanceInfo — тот самый баланс Авито.Работы, который виден в
+    личном кабинете и с которого списывается за продвижение вакансий. Именно
+    он кончается, и именно из-за него объявления перестают показываться.
+    Значение приходит в копейках. Эндпоинт быстро упирается в 429 — тогда
+    просто молчим до следующего раза, а не пугаем человека.
+    """
+    now = int(datetime.now(timezone.utc).timestamp())
+    checked_at = int(state.get("balance_checked_at") or 0)
+    if now - checked_at < BALANCE_EVERY_MIN * 60:
+        return                      # эндпоинт быстро отдаёт 429, не трогаем его лишний раз
+
     try:
-        data = get_json("%s/core/v1/accounts/%s/balance/" % (API, user), token)
+        kopecks = post_json(API + "/cpa/v3/balanceInfo", token, {}).get("balance")
     except Exception as exc:
-        print("nika-avito-watch: баланс недоступен: %s" % exc, file=sys.stderr)
+        print("nika-avito-watch: баланс Авито.Работы недоступен (%s) — пропускаю проверку"
+              % exc, file=sys.stderr)
         return
-    total = (data.get("real") or 0) + (data.get("bonus") or 0)
+    state["balance_checked_at"] = now
+    if not isinstance(kopecks, (int, float)):
+        print("nika-avito-watch: неожиданный ответ по балансу, пропускаю", file=sys.stderr)
+        return
+
+    rubles = kopecks / 100.0
     was_low = bool(state.get("balance_low"))
-    is_low = total < BALANCE_FLOOR
+    is_low = rubles < BALANCE_FLOOR
     state["balance_low"] = is_low
-    state["balance_value"] = total
+    state["balance_value"] = rubles
+
     if is_low and not was_low:
-        out.append("Баланс Авито: %s, это ниже порога %s\n"
-                   "Платные размещения и продвижение остановятся, объявления уйдут из показа.\n"
+        out.append("Баланс Авито.Работы: %s, это ниже порога %s\n"
+                   "Когда он кончится, продвижение вакансий остановится и объявления "
+                   "уйдут из показа.\n"
                    "Пополнить: https://www.avito.ru/profile/wallet"
-                   % (rub(total), rub(BALANCE_FLOOR)))
+                   % (rub(rubles), rub(BALANCE_FLOOR)))
     elif was_low and not is_low:
-        out.append("Баланс Авито пополнен, сейчас %s. Всё в порядке." % rub(total))
+        out.append("Баланс Авито.Работы пополнен, сейчас %s. Всё в порядке." % rub(rubles))
 
 
 def check_items(token: str, user: str, state: dict, out: list) -> None:
