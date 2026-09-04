@@ -874,6 +874,85 @@ else
   warn "Каталог OpenRouter не прочитался (curl=$CATALOG_RC). Модель придётся выбрать вручную."
 fi
 
+# Апстрим оставляет в config.yaml платную модель. На ключе владелицы это прямые
+# деньги, поэтому если выбранная модель не :free — ставим проверенную бесплатную
+# и запасную цепочку. Уже сделанный вручную выбор не трогаем.
+NIKA_MODEL_DEFAULT="${NIKA_MODEL_DEFAULT:-minimax/minimax-m3:free}"
+NIKA_FALLBACK_1="${NIKA_FALLBACK_1:-dots-studio/dots-3-note-preview:free}"
+NIKA_FALLBACK_2="${NIKA_FALLBACK_2:-minimax/minimax-m2.7:free}"
+
+if command -v python3 >/dev/null 2>&1 && [ -s "$NIKA_HOME/config.yaml" ]; then
+  cp -a "$NIKA_HOME/config.yaml" "$BACKUP_DIR/config.yaml.before-model"
+  set +e
+  MODEL_MSG="$(CFG="$NIKA_HOME/config.yaml" M="$NIKA_MODEL_DEFAULT" F1="$NIKA_FALLBACK_1" F2="$NIKA_FALLBACK_2" python3 - <<'PYMODEL'
+import os
+
+cfg = os.environ["CFG"]
+want, f1, f2 = os.environ["M"], os.environ["F1"], os.environ["F2"]
+lines = open(cfg, encoding="utf-8").read().split("\n")
+
+# 1. model.default — только если там не бесплатная модель
+in_model, changed, cur = False, None, None
+for i, line in enumerate(lines):
+    if line.startswith("model:"):
+        in_model = True
+        continue
+    if in_model and line and not line[0].isspace():
+        break
+    if not in_model:
+        continue
+    stripped = line.strip()
+    if stripped.startswith("default:") or stripped.startswith("model:"):
+        cur = stripped.split(":", 1)[1].strip().strip('"').strip("'")
+        if not cur.endswith(":free"):
+            indent = line[: len(line) - len(line.lstrip())]
+            lines[i] = '%sdefault: "%s"' % (indent, want)
+            changed = cur
+        break
+    if stripped.startswith("provider:"):
+        indent = line[: len(line) - len(line.lstrip())]
+        lines[i] = '%sprovider: "openrouter"' % indent
+
+text = "\n".join(lines)
+
+# 2. запасная цепочка — только если её ещё нет
+added = False
+if "fallback_providers" not in text:
+    block = [
+        "",
+        "# Запасная цепочка на случай 429 от бесплатного пула OpenRouter.",
+        "# Провайдеры намеренно разные: общий лимит накрывает модели одного",
+        "# апстрима вместе, поэтому вторая ступень идёт через другой.",
+        "fallback_providers:",
+    ]
+    for m in (f1, f2):
+        block += ["  - provider: openrouter", '    model: "%s"' % m,
+                  '    base_url: "https://openrouter.ai/api/v1"']
+    text = text.rstrip("\n") + "\n" + "\n".join(block) + "\n"
+    added = True
+
+open(cfg, "w", encoding="utf-8").write(text)
+
+if changed:
+    print("модель заменена: %s -> %s" % (changed, want))
+elif cur:
+    print("модель оставлена как есть: %s" % cur)
+if added:
+    print("запасная цепочка добавлена: %s, %s" % (f1, f2))
+else:
+    print("запасная цепочка уже была настроена")
+PYMODEL
+)"
+  MODEL_RC=$?
+  set -e
+  chmod 600 "$NIKA_HOME/config.yaml"
+  if [ "$MODEL_RC" = 0 ]; then
+    while IFS= read -r l; do [ -n "$l" ] && ok "$l"; done <<< "$MODEL_MSG"
+  else
+    warn "Не смог поправить модель в config.yaml — проверь поле model.default вручную"
+  fi
+fi
+
 # =============================================================================
 #  ФАЗА 6 — systemd
 # =============================================================================
