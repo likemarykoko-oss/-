@@ -25,12 +25,17 @@ bash /root/install-nika.sh              # 2. установка
 | | боевой Hermes | Ника |
 |---|---|---|
 | код | `/usr/local/lib/hermes-agent` | `/opt/hermes-nika` |
-| данные | `/root/.hermes` | `/opt/hermes-nika/home` |
+| данные | `/root/.hermes` | `/opt/hermes-nika-home` |
 | сервис | `hermes-gateway` | `hermes-nika-gateway` |
 | A2A | `127.0.0.1:9900` | `127.0.0.1:9901` |
 | CLI | `hermes` | `hermes-nika` |
 | provider | Codex (OAuth) | **OpenRouter** |
 | голос/STT | есть | не ставится |
+
+Данные Ники лежат рядом с кодом, а не внутри него, и это не вкусовщина: апстрим-
+установщик раскладывает managed `uv` в `$HERMES_HOME/bin` **до** клонирования
+репозитория в `--dir`, а затем требует, чтобы `--dir` был либо git-репозиторием,
+либо пустым. При вложенной раскладке он сам себе мешает и падает.
 
 ## Защита боевого бота
 

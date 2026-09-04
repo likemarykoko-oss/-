@@ -29,7 +29,10 @@ set -Eeuo pipefail
 
 # ------------------------------- Параметры -----------------------------------
 NIKA_DIR="${NIKA_DIR:-/opt/hermes-nika}"          # код второй инсталляции
-NIKA_HOME="${NIKA_HOME:-/opt/hermes-nika/home}"   # данные второй инсталляции
+NIKA_HOME="${NIKA_HOME:-/opt/hermes-nika-home}"   # данные второй инсталляции
+# ВАЖНО: данные НЕ должны лежать внутри $NIKA_DIR. Апстрим-установщик кладёт
+# managed uv в $HERMES_HOME/bin ещё до клонирования кода, и при вложенной
+# раскладке сам себе создаёт непустой не-git каталог, на котором и падает.
 NIKA_SERVICE="${NIKA_SERVICE:-hermes-nika-gateway}"
 NIKA_A2A_PORT="${NIKA_A2A_PORT:-9901}"            # у боевого 9900
 
@@ -143,7 +146,7 @@ if [ "$UNINSTALL" = 1 ]; then
   rm -f "/etc/systemd/system/${NIKA_SERVICE}.service"
   systemctl daemon-reload || true
   rm -f /usr/local/bin/hermes-nika /usr/local/bin/hermes-nika-raw
-  rm -rf "$NIKA_DIR"
+  rm -rf "$NIKA_DIR" "$NIKA_HOME"
   ok "Удалено. Боевой бот не затронут: $(systemctl is-active "$PROD_SERVICE" 2>/dev/null || echo unknown)"
   exit 0
 fi
@@ -227,7 +230,7 @@ else
   head -5 "$PROD_HOME/SOUL.md" | sed 's/^/      | /'
   if [ -n "$(head -40 "$PROD_HOME/SOUL.md" | grep -iE 'ника|студи|рекрут|кандидат|мэри' || true)" ]; then
     warn "Похоже, на боевом боте всё ещё промпт «Ника» — его должны были откатить."
-    NEWEST_BAK="$(find "$PROD_HOME" -maxdepth 1 -name 'SOUL.md.bak-*' ! -name '*nika-recruiter*' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)"
+    NEWEST_BAK="$(find "$PROD_HOME" -maxdepth 1 -name 'SOUL.md.bak-*' ! -name '*nika-recruiter*' -printf '%T@ %p\n' 2>/dev/null | sort -rn | awk 'NR<=1' | cut -d' ' -f2-)"
     if [ -n "${NEWEST_BAK:-}" ]; then
       info "Самый свежий подходящий бэкап: $NEWEST_BAK ($(date -r "$NEWEST_BAK" '+%F %T'))"
       info "Его первые строки:"
@@ -281,10 +284,10 @@ fi
 
 # как в боевом .env называется переменная токена телеграма
 TG_TOKEN_VAR="$(grep -aoE '^[[:space:]]*(export[[:space:]]+)?[A-Z0-9_]*TELEGRAM[A-Z0-9_]*(TOKEN|BOT_TOKEN)' "$PROD_HOME/.env" 2>/dev/null \
-                 | sed -E 's/^[[:space:]]*(export[[:space:]]+)?//' | head -1)"
+                 | sed -E 's/^[[:space:]]*(export[[:space:]]+)?//' | awk 'NR<=1')"
 TG_TOKEN_VAR="${TG_TOKEN_VAR:-TELEGRAM_BOT_TOKEN}"
 TG_USERS_VAR="$(grep -aoE '^[[:space:]]*(export[[:space:]]+)?[A-Z0-9_]*ALLOWED_USERS' "$PROD_HOME/.env" 2>/dev/null \
-                 | sed -E 's/^[[:space:]]*(export[[:space:]]+)?//' | head -1)"
+                 | sed -E 's/^[[:space:]]*(export[[:space:]]+)?//' | awk 'NR<=1')"
 TG_USERS_VAR="${TG_USERS_VAR:-TELEGRAM_ALLOWED_USERS}"
 ok "Имена переменных из боевого конфига: $TG_TOKEN_VAR / $TG_USERS_VAR"
 
@@ -324,8 +327,24 @@ else
   warn "$HERMES_BIN не найден"
 fi
 
-mkdir -p "$NIKA_DIR" "$NIKA_HOME"
-chmod 700 "$NIKA_HOME"
+# $NIKA_HOME лежит ВНУТРИ $NIKA_DIR, а апстрим-установщик требует, чтобы
+# каталог из --dir был либо git-репозиторием, либо вовсе отсутствовал.
+# Поэтому заранее создаём только родительский каталог, а $NIKA_HOME —
+# уже после того, как установщик склонирует туда код.
+mkdir -p "$(dirname "$NIKA_DIR")"
+if [ -d "$NIKA_DIR" ] && [ ! -d "$NIKA_DIR/.git" ]; then
+  # Прерванная попытка оставляет каталог без .git, но с уже разложенным uv.
+  # Сносим такой каталог только если настоящей инсталляции Ники ещё нет.
+  if [ -f "$NIKA_HOME/.env" ] || [ -f "$NIKA_HOME/config.yaml" ] || [ -f "/etc/systemd/system/$NIKA_SERVICE.service" ]; then
+    die "$NIKA_DIR не git-репозиторий, но похож на живую инсталляцию Ники. Разберись руками или откатись: bash $0 --uninstall"
+  fi
+  STRAY="$(find "$NIKA_DIR" -mindepth 1 -maxdepth 1 2>/dev/null | head -5 || true)"
+  if [ -n "$STRAY" ]; then
+    die "$NIKA_DIR существует, не git-репозиторий и содержит посторонние файлы. Проверь его сам, я туда не полезу."
+  fi
+  rm -rf "$NIKA_DIR"
+  ok "Убрал остатки прерванной попытки в $NIKA_DIR — код будет склонирован заново"
+fi
 
 INST_TMP="$(mktemp /tmp/hermes-install.XXXXXX.sh)"
 curl -fsSL "$INSTALLER_URL" -o "$INST_TMP" || die "Не скачался установщик: $INSTALLER_URL"
@@ -333,7 +352,7 @@ chmod +x "$INST_TMP"
 ok "Установщик получен ($(wc -c < "$INST_TMP") байт)"
 
 # оставляем только те флаги, которые установщик реально понимает
-HELP_TXT="$(bash "$INST_TMP" --help 2>&1 || true)"
+HELP_TXT="$(bash "$INST_TMP" --help </dev/null 2>&1 || true)"
 printf '%s\n' "$HELP_TXT" > "$BACKUP_DIR/installer-help.txt"
 
 ARGS=(--dir "$NIKA_DIR" --hermes-home "$NIKA_HOME")
@@ -345,21 +364,35 @@ if [ -n "$(printf '%s' "$HELP_TXT" | grep -- '--dir' || true)" ]; then
   supports '--skip-computer-use' && ARGS+=(--skip-computer-use)
   supports '--skip-setup'        && ARGS+=(--skip-setup)
   supports '--non-interactive'   && ARGS+=(--non-interactive)
-  # без ffmpeg -> без голосового стека; ставим только необходимое
-  supports '--ensure'            && ARGS+=(--ensure node,ripgrep)
+  # ВНИМАНИЕ: --ensure у апстрима означает «поставить ТОЛЬКО эти зависимости
+  # и выйти» — репозиторий он при этом не клонирует и venv не создаёт.
+  # Поэтому это отдельный предварительный прогон, а не флаг установки.
+  if supports '--ensure'; then
+    info "Предварительно доставляю зависимости (node, ripgrep; ffmpeg намеренно нет)"
+    if bash "$INST_TMP" --ensure node,ripgrep </dev/null >>"$LOG_FILE" 2>&1; then
+      ok "Зависимости на месте"
+    else
+      warn "Прогон --ensure завершился с ошибкой — смотри $LOG_FILE, продолжаю"
+    fi
+  fi
 else
   warn "Справка установщика не прочиталась — использую документированный набор флагов"
-  ARGS+=(--skip-browser --skip-computer-use --skip-setup --non-interactive --ensure node,ripgrep)
+  ARGS+=(--skip-browser --skip-computer-use --skip-setup --non-interactive)
 fi
 
 info "Флаги: ${ARGS[*]}"
 info "Идёт установка, это долго. Лог: $LOG_FILE"
 
 MEM_BEFORE="$(mem_avail_mb)"
+# Апстрим-установщик даже с --non-interactive спрашивает про собственный
+# gateway и читает stdin. Если его не отсечь, он съедает токен, который
+# мы готовим для фазы 4. Отвечаем ему «n» на всё: сервис Ники поднимаем
+# сами в фазе 6.
 set +e
-HERMES_HOME="$NIKA_HOME" HERMES_INSTALL_DIR="$NIKA_DIR" \
-  bash "$INST_TMP" "${ARGS[@]}" >>"$LOG_FILE" 2>&1
-INST_RC=$?
+set +o pipefail
+yes n | HERMES_HOME="$NIKA_HOME" HERMES_INSTALL_DIR="$NIKA_DIR" bash "$INST_TMP" "${ARGS[@]}" >>"$LOG_FILE" 2>&1
+INST_RC=${PIPESTATUS[1]}
+set -o pipefail
 set -e
 MEM_AFTER="$(mem_avail_mb)"
 info "RAM доступно: было ${MEM_BEFORE}M → стало ${MEM_AFTER}M"
@@ -370,6 +403,9 @@ if [ "$INST_RC" -ne 0 ]; then
   die "Разбери лог $LOG_FILE и запусти скрипт снова."
 fi
 ok "Hermes установлен в $NIKA_DIR"
+
+mkdir -p "$NIKA_HOME"
+chmod 700 "$NIKA_HOME"
 
 # восстанавливаем лаунчер боевого бота, если установщик его переписал
 if [ -n "$PROD_LAUNCHER_SUM" ] && [ -f "$HERMES_BIN" ]; then
@@ -391,13 +427,33 @@ fi
 [ -n "${NIKA_RAW:-}" ] || die "Не нашёл исполняемый hermes для второй инсталляции. Загляни в $NIKA_DIR."
 ok "Бинарь Ники: $NIKA_RAW"
 
+# Интерпретатор берём из venv Ники: сам файл hermes — обычный python-скрипт,
+# и системным python он падает на ModuleNotFoundError (dotenv и прочее).
+NIKA_PY=""
+for cand in "$NIKA_DIR/venv/bin/python" "$NIKA_DIR/.venv/bin/python"; do
+  [ -x "$cand" ] && { NIKA_PY="$cand"; break; }
+done
+
 # удобная обёртка с прибитым HERMES_HOME
-cat > /usr/local/bin/hermes-nika <<WRAP
+if [ -n "$NIKA_PY" ]; then
+  ok "Интерпретатор Ники: $NIKA_PY"
+  cat > /usr/local/bin/hermes-nika <<WRAP
+#!/usr/bin/env bash
+unset PYTHONPATH
+unset PYTHONHOME
+export HERMES_HOME="$NIKA_HOME"
+export HERMES_INSTALL_DIR="$NIKA_DIR"
+exec "$NIKA_PY" "$NIKA_RAW" "\$@"
+WRAP
+else
+  warn "venv Ники не найден — обёртка вызовет $NIKA_RAW напрямую"
+  cat > /usr/local/bin/hermes-nika <<WRAP
 #!/usr/bin/env bash
 export HERMES_HOME="$NIKA_HOME"
 export HERMES_INSTALL_DIR="$NIKA_DIR"
 exec "$NIKA_RAW" "\$@"
 WRAP
+fi
 chmod +x /usr/local/bin/hermes-nika
 ok "Создана команда hermes-nika (боевая hermes не тронута)"
 
@@ -406,7 +462,15 @@ ok "Создана команда hermes-nika (боевая hermes не трон
 # =============================================================================
 step "Фаза 4. Telegram-бот"
 
-TG_TOKEN=""
+# Токен и список user id можно передать окружением — тогда скрипт
+# отработает без терминала (и без риска, что чужой процесс съест ввод).
+TG_TOKEN="${NIKA_TG_TOKEN:-}"
+TG_TOKEN="${TG_TOKEN//[[:space:]]/}"
+TOKEN_FROM_ENV=0
+if [ -n "$TG_TOKEN" ]; then
+  TOKEN_FROM_ENV=1
+  info "Токен взят из NIKA_TG_TOKEN — не спрашиваю"
+fi
 while [ -z "$TG_TOKEN" ]; do
   printf '  Вставь токен от @BotFather (ввод скрыт, в лог не попадёт): '
   read -r -s TG_TOKEN </dev/tty; printf '\n'
@@ -426,9 +490,21 @@ while [ -z "$TG_TOKEN" ]; do
   fi
 done
 
-TG_USERS=""
-printf '  Числовые user id владельцев через запятую (Enter — определить автоматически): '
-read -r TG_USERS </dev/tty || true
+if [ "$TOKEN_FROM_ENV" = 1 ]; then
+  [[ "$TG_TOKEN" =~ ^[0-9]{6,15}:[A-Za-z0-9_-]{30,}$ ]] || die "NIKA_TG_TOKEN не похож на токен @BotFather."
+  BOT_JSON="$(curl -fsS --max-time 20 "https://api.telegram.org/bot${TG_TOKEN}/getMe" 2>/dev/null || true)"
+  BOT_NAME="$(printf '%s' "$BOT_JSON" | sed -n 's/.*"username":"\([^"]*\)".*/\1/p')"
+  [ -n "$BOT_NAME" ] || die "Telegram не подтвердил NIKA_TG_TOKEN. Проверь токен у @BotFather."
+  ok "Токен рабочий, бот: @$BOT_NAME"
+fi
+
+TG_USERS="${NIKA_TG_USERS:-}"
+if [ -n "$TG_USERS" ]; then
+  info "Список user id взят из NIKA_TG_USERS"
+else
+  printf '  Числовые user id владельцев через запятую (Enter — определить автоматически): '
+  read -r TG_USERS </dev/tty || true
+fi
 TG_USERS="${TG_USERS//[[:space:]]/}"
 
 if [ -z "$TG_USERS" ]; then
@@ -467,9 +543,12 @@ umask 077
 chmod 600 "$NIKA_HOME/.env"
 ok ".env записан (chmod 600, $(wc -l < "$NIKA_HOME/.env") строк)"
 
-# страховка: ничего от Codex/OpenAI не просочилось
-if grep -qiE 'codex|openai|chatgpt' "$NIKA_HOME/.env"; then
-  die "В .env Ники попали Codex/OpenAI-переменные — это ломает боевого бота. Прерываю."
+# страховка: ничего от Codex/OpenAI не просочилось.
+# Смотрим только строки присваивания: в шапке файла Codex упомянут
+# в комментарии, и раньше проверка ловила сама себя.
+CODEX_LEAK="$(grep -vE '^[[:space:]]*(#|$)' "$NIKA_HOME/.env" | grep -iE 'codex|openai|chatgpt' | cut -d= -f1 || true)"
+if [ -n "$CODEX_LEAK" ]; then
+  die "В .env Ники попали Codex/OpenAI-переменные ($CODEX_LEAK) — это ломает боевого бота. Прерываю."
 fi
 ok "Проверено: Codex-переменных в .env Ники нет"
 
@@ -745,7 +824,7 @@ if [ -f "$NIKA_HOME/config.yaml" ]; then
 
   if grep -qiE 'codex' "$NIKA_HOME/config.yaml"; then
     warn "В config.yaml остались упоминания Codex — их нужно убрать вручную."
-    grep -niE 'codex' "$NIKA_HOME/config.yaml" | head -10 | sed 's/^/      | /'
+    grep -niE 'codex' "$NIKA_HOME/config.yaml" | awk 'NR<=10' | sed 's/^/      | /'
     info "Строки выше попадут в отчёт $REPORT_FILE"
   fi
 else
@@ -754,18 +833,45 @@ fi
 
 # ------------------------------- модель --------------------------------------
 step "Подбор бесплатной модели OpenRouter"
+# `hermes model` требует терминала и в скрипте падает, поэтому берём каталог
+# напрямую из API. Нужны только :free с поддержкой tools — без неё агент не
+# сможет пользоваться инструментами.
+CUR_MODEL="$(grep -A6 '^model:' "$NIKA_HOME/config.yaml" 2>/dev/null | sed -nE 's/^[[:space:]]+default:[[:space:]]*"?([^"]+)"?.*/\1/p' | awk 'NR<=1')"
+[ -n "${CUR_MODEL:-}" ] && info "Сейчас в конфиге: $CUR_MODEL"
+
+MODELS_JSON="$BACKUP_DIR/openrouter-models.json"
 set +e
-MODEL_OUT="$(HERMES_HOME="$NIKA_HOME" timeout 90 /usr/local/bin/hermes-nika model --refresh 2>&1)"
+curl -fsS --max-time 30 https://openrouter.ai/api/v1/models -o "$MODELS_JSON"
+CATALOG_RC=$?
 set -e
-printf '%s\n' "$MODEL_OUT" > "$BACKUP_DIR/models.txt"
-FREE_MODELS="$(printf '%s\n' "$MODEL_OUT" | grep -oE '[A-Za-z0-9._/-]+:free' | sort -u | head -15)"
+
+FREE_MODELS=""
+if [ "$CATALOG_RC" = 0 ] && command -v python3 >/dev/null 2>&1; then
+  FREE_MODELS="$(python3 - "$MODELS_JSON" <<'PYCAT' || true
+import json, sys
+rows = []
+for m in json.load(open(sys.argv[1], encoding="utf-8")).get("data", []):
+    mid = m.get("id") or ""
+    if not mid.endswith(":free"):
+        continue
+    if "tools" not in (m.get("supported_parameters") or []):
+        continue
+    rows.append((m.get("context_length") or 0, mid))
+rows.sort(reverse=True)
+for ctx, mid in rows[:15]:
+    print("%-50s контекст %s" % (mid, ctx))
+PYCAT
+)"
+fi
+
 if [ -n "$FREE_MODELS" ]; then
-  ok "Бесплатные модели в живом каталоге:"
+  ok "Бесплатные модели с поддержкой tools (по убыванию контекста):"
   printf '%s\n' "$FREE_MODELS" | nl -w6 -s'. ' | sed 's/^/      /'
-  info "Полный вывод: $BACKUP_DIR/models.txt"
-  info "Выбрать модель: hermes-nika model <id>  (потом systemctl restart $NIKA_SERVICE)"
+  info "Полный каталог: $MODELS_JSON"
+  info "Сменить модель: поле model.default в $NIKA_HOME/config.yaml, потом systemctl restart $NIKA_SERVICE"
+  info "Проверить живьём: hermes-nika -z \"привет\""
 else
-  warn "Не удалось распарсить каталог моделей. Сырой вывод — в $BACKUP_DIR/models.txt"
+  warn "Каталог OpenRouter не прочитался (curl=$CATALOG_RC). Модель придётся выбрать вручную."
 fi
 
 # =============================================================================
@@ -870,7 +976,7 @@ step "Фаза 7. Отчёт"
   sed -E 's/=.*/=***/' "$NIKA_HOME/.env" 2>/dev/null
   echo
   echo "--- config.yaml Ники (секреты скрыты) ---"
-  sed -E 's/((key|token|secret|password)[^:]*:).*/\1 ***/I' "$NIKA_HOME/config.yaml" 2>/dev/null | head -120
+  sed -E 's/((key|token|secret|password)[^:]*:).*/\1 ***/I' "$NIKA_HOME/config.yaml" 2>/dev/null | awk 'NR<=120'
   echo
   echo "--- юнит ---"; cat "$NIKA_UNIT"
   echo
