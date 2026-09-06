@@ -32,7 +32,10 @@ MSK = timezone(timedelta(hours=3))
 
 BALANCE_FLOOR = int(os.environ.get("NIKA_BALANCE_FLOOR", "200"))      # рублей
 EXPIRY_DAYS = int(os.environ.get("NIKA_EXPIRY_DAYS", "3"))            # дней до снятия
-MANAGER = os.environ.get("NIKA_MANAGER", "Управляющая")               # к кому обращаться в чате
+# Отметка управляющей нужна ровно в одном случае — когда речь про деньги.
+# Остальные уведомления адресованы всему чату и никого персонально не дёргают.
+MANAGER_TAG = os.environ.get("NIKA_MANAGER_TAG", "").strip()          # например «@marina»
+MANAGER = os.environ.get("NIKA_MANAGER", "Управляющая")               # запасное обращение
 MAX_LIST = int(os.environ.get("NIKA_MAX_LIST", "8"))                 # строк в одном сообщении
 BALANCE_EVERY_MIN = int(os.environ.get("NIKA_BALANCE_EVERY_MIN", "60"))  # как часто трогать баланс
 SEND_BIN = os.environ.get("NIKA_SEND_BIN", "/usr/local/bin/hermes-nika")
@@ -93,6 +96,16 @@ def save_state(path: str, state: dict) -> None:
         json.dump(state, fh, ensure_ascii=False)
     os.chmod(tmp, 0o600)
     os.replace(tmp, path)
+
+
+def manager_call() -> str:
+    """Как окликнуть управляющую в общем чате.
+
+    Настоящая отметка возможна только по @username: Telegram превращает её в
+    ссылку и присылает человеку уведомление. Без него остаётся обычное слово,
+    которое в чате никого не разбудит, — поэтому имя стоит задать.
+    """
+    return MANAGER_TAG if MANAGER_TAG else MANAGER
 
 
 def rub(value) -> str:
@@ -165,10 +178,10 @@ def check_balance(token: str, user: str, state: dict, out: list) -> None:
                    "Когда он кончится, продвижение вакансий остановится и объявления "
                    "уйдут из показа.\n"
                    "Пополнить: https://www.avito.ru/profile/wallet"
-                   % (MANAGER, rub(rubles), rub(BALANCE_FLOOR)))
+                   % (manager_call(), rub(rubles), rub(BALANCE_FLOOR)))
     elif was_low and not is_low:
         out.append("%s, баланс Авито.Работы пополнен, сейчас %s. Всё в порядке."
-                   % (MANAGER, rub(rubles)))
+                   % (manager_call(), rub(rubles)))
 
 
 def check_items(token: str, user: str, state: dict, out: list) -> None:
@@ -202,16 +215,15 @@ def check_items(token: str, user: str, state: dict, out: list) -> None:
         key = "expiry_%s_%s" % (iid, ends.date().isoformat())
         if 0 <= days <= EXPIRY_DAYS and not state.get(key):
             state[key] = True
-            out.append("%s, объявление «%s» снимется %s, осталось %d дн.\n"
-                       "Если вакансия ещё нужна, продлите: %s"
-                       % (MANAGER, title, ends.strftime("%d.%m в %H:%M"), int(days),
+            out.append("Объявление «%s» снимется %s, осталось %d дн.\n"
+                       "Если вакансия ещё нужна — надо продлить: %s"
+                       % (title, ends.strftime("%d.%m в %H:%M"), int(days),
                           item.get("url") or "личный кабинет Авито"))
 
     for iid, title in seen_before.items():
         if iid not in seen_now:
-            out.append("%s, объявление «%s» больше не активно: снято, закончилось "
-                       "или отклонено.\nОтклики по нему приходить перестанут."
-                       % (MANAGER, title))
+            out.append("Объявление «%s» больше не активно: снято, закончилось "
+                       "или отклонено.\nОтклики по нему приходить перестанут." % title)
     state["active_items"] = seen_now
 
 
@@ -278,8 +290,8 @@ def check_new_leads(token: str, user: str, state: dict, out: list) -> None:
 
     shown = leads[:MAX_LIST]
     tail = len(leads) - len(shown)
-    head = ("%s, у нас новый отклик на Авито:" % MANAGER if len(leads) == 1
-            else "%s, у нас новые отклики на Авито — %d:" % (MANAGER, len(leads)))
+    head = ("У нас новый отклик на Авито:" if len(leads) == 1
+            else "У нас новые отклики на Авито — %d:" % len(leads))
     parts = [head, "\n".join(shown)]
     if tail > 0:
         parts.append("…и ещё %d." % tail)
