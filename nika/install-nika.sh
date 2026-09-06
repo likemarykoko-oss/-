@@ -915,15 +915,35 @@ UNIT
     chmod 755 "$WATCH_BIN"
     ok "Сторож Авито: $WATCH_BIN"
 
+    # Настройки сторожа — отдельным файлом, чтобы менять ник управляющей и
+    # пороги, не трогая systemd. Существующий не перезаписываем.
+    if [ ! -f "$NIKA_HOME/watch.env" ]; then
+      umask 077
+      cat > "$NIKA_HOME/watch.env" <<'CFG'
+# Настройки сторожа Авито. После правки: systemctl restart nika-avito-watch.timer
+#
+# Ник управляющей в Telegram — только он даёт настоящую отметку с уведомлением.
+# Подставляется ТОЛЬКО в сообщения про баланс; остальные адресованы всему чату.
+NIKA_MANAGER_TAG=
+# Порог баланса Авито.Работы, рублей
+NIKA_BALANCE_FLOOR=200
+# За сколько дней предупреждать о снятии объявления
+NIKA_EXPIRY_DAYS=3
+CFG
+      chmod 600 "$NIKA_HOME/watch.env"
+      ok "Настройки сторожа: $NIKA_HOME/watch.env"
+    fi
+
     cat > /etc/systemd/system/nika-avito-watch.service <<UNIT
 [Unit]
-Description=Ника — сторож Авито (баланс, сроки объявлений, неотвеченные)
+Description=Ника — сторож Авито (баланс, сроки объявлений, новые отклики)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
 Environment=HERMES_HOME=$NIKA_HOME
+EnvironmentFile=-$NIKA_HOME/watch.env
 ExecStart=$WATCH_BIN
 Nice=10
 MemoryMax=128M
