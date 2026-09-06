@@ -174,14 +174,16 @@ def check_balance(token: str, user: str, state: dict, out: list) -> None:
     state["balance_value"] = rubles
 
     if is_low and not was_low:
-        out.append("%s, баланс Авито.Работы упал до %s — это ниже порога %s\n"
-                   "Когда он кончится, продвижение вакансий остановится и объявления "
-                   "уйдут из показа.\n"
+        out.append("%s, привет! Баланс Авито.Работы опустился до %s — это ниже "
+                   "нашего порога в %s\n"
+                   "Давайте пополним, пока объявления в показе: как только баланс "
+                   "кончится, продвижение встанет и отклики просто перестанут "
+                   "приходить.\n"
                    "Пополнить: https://www.avito.ru/profile/wallet"
                    % (manager_call(), rub(rubles), rub(BALANCE_FLOOR)))
     elif was_low and not is_low:
-        out.append("%s, баланс Авито.Работы пополнен, сейчас %s. Всё в порядке."
-                   % (manager_call(), rub(rubles)))
+        out.append("%s, спасибо! Баланс пополнен, сейчас %s — объявления "
+                   "продолжают работать 👍" % (manager_call(), rub(rubles)))
 
 
 def check_items(token: str, user: str, state: dict, out: list) -> None:
@@ -215,15 +217,19 @@ def check_items(token: str, user: str, state: dict, out: list) -> None:
         key = "expiry_%s_%s" % (iid, ends.date().isoformat())
         if 0 <= days <= EXPIRY_DAYS and not state.get(key):
             state[key] = True
-            out.append("Объявление «%s» снимется %s, осталось %d дн.\n"
-                       "Если вакансия ещё нужна — надо продлить: %s"
+            out.append("Небольшое напоминание: объявление «%s» снимется %s, "
+                       "осталось %d дн.\n"
+                       "Если вакансия ещё в работе — давайте продлим, чтобы не "
+                       "терять поток откликов: %s"
                        % (title, ends.strftime("%d.%m в %H:%M"), int(days),
                           item.get("url") or "личный кабинет Авито"))
 
     for iid, title in seen_before.items():
         if iid not in seen_now:
-            out.append("Объявление «%s» больше не активно: снято, закончилось "
-                       "или отклонено.\nОтклики по нему приходить перестанут." % title)
+            out.append("Обратите внимание: объявление «%s» больше не активно — "
+                       "снято, закончилось или отклонено.\n"
+                       "Отклики по нему приходить перестанут. Если вакансия ещё "
+                       "нужна, стоит разместить заново." % title)
     state["active_items"] = seen_now
 
 
@@ -290,12 +296,14 @@ def check_new_leads(token: str, user: str, state: dict, out: list) -> None:
 
     shown = leads[:MAX_LIST]
     tail = len(leads) - len(shown)
-    head = ("У нас новый отклик на Авито:" if len(leads) == 1
-            else "У нас новые отклики на Авито — %d:" % len(leads))
+    head = ("К нам новый отклик на Авито 🎉" if len(leads) == 1
+            else "К нам новые отклики на Авито — сразу %d 🎉" % len(leads))
     parts = [head, "\n".join(shown)]
     if tail > 0:
         parts.append("…и ещё %d." % tail)
-    parts.append("Не забудьте обработать: %s" % MESSENGER_URL)
+    parts.append("Ответим побыстрее, пока человек тёплый и выбирает — "
+                 "первый ответ решает больше всего.\nОткрыть переписку: %s"
+                 % MESSENGER_URL)
     out.append("\n\n".join(parts))
 
 
