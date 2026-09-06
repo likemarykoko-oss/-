@@ -1140,6 +1140,15 @@ if [ -n "$PROD_UNIT" ] && [ -f "$PROD_UNIT" ]; then
     || sed -i "/^\[Service\]/a MemoryHigh=600M" "$NIKA_UNIT"
   grep -q "^MemoryMax=" "$NIKA_UNIT" \
     || sed -i "/^\[Service\]/a MemoryMax=900M" "$NIKA_UNIT"
+
+  # У боевого юнита TimeoutStopSec=60, а Hermes при остановке хочет доиграть
+  # очередь cron (30с) и просит запас >=70с — иначе systemd прибьёт его
+  # посреди слива и об этом ругается в лог при каждом старте.
+  if grep -q "^TimeoutStopSec=" "$NIKA_UNIT"; then
+    sed -i "s/^TimeoutStopSec=.*/TimeoutStopSec=90/" "$NIKA_UNIT"
+  else
+    sed -i "/^\[Service\]/a TimeoutStopSec=90" "$NIKA_UNIT"
+  fi
 else
   warn "Юнит боевого сервиса не найден — генерирую с нуля"
   cat > "$NIKA_UNIT" <<UNIT
